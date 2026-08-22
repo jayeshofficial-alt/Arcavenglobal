@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X, Smartphone, Globe2 } from 'lucide-react';
+import { ShoppingBag, Menu, X } from 'lucide-react';
 import { RfqItem } from '../types';
 
 interface NavbarProps {
   cartItems: RfqItem[];
   onOpenCart: () => void;
   onOpenQuickQuote: () => void;
-  onOpenPlayStoreGuide?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   cartItems,
   onOpenCart,
   onOpenQuickQuote,
-  onOpenPlayStoreGuide
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -120,19 +118,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="flex items-center gap-3 pl-3 border-l border-gray-100">
-              {/* Play Store App Hub Button */}
-              {onOpenPlayStoreGuide && (
-                <button
-                  id="header-play-store-btn"
-                  onClick={onOpenPlayStoreGuide}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#2D5A27] text-xs font-heading font-bold uppercase tracking-wider transition-all border border-emerald-200 cursor-pointer"
-                  title="Google Play Store & Mobile App Publishing"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Play App</span>
-                </button>
-              )}
-
               {/* RFQ Cart Icon */}
               <button
                 id="cart-drawer-trigger"
@@ -162,17 +147,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile Right Controls */}
           <div className="flex items-center gap-1.5 lg:hidden">
-            {onOpenPlayStoreGuide && (
-              <button
-                onClick={onOpenPlayStoreGuide}
-                className="p-1.5 rounded-full bg-emerald-50 text-[#2D5A27] border border-emerald-200 text-xs font-bold flex items-center gap-1"
-                aria-label="Play Store App"
-              >
-                <Smartphone className="w-4 h-4" />
-                <span className="text-[10px] font-heading hidden sm:inline">App</span>
-              </button>
-            )}
-
             <button
               id="mobile-cart-btn"
               onClick={onOpenCart}
@@ -242,22 +216,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {link.name}
                   </a>
                 ))}
-
-                {onOpenPlayStoreGuide && (
-                  <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onOpenPlayStoreGuide();
-                    }}
-                    className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold font-heading text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-between mt-2"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Smartphone className="w-4 h-4" />
-                      <span>Google Play Store & Mobile App</span>
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-200 text-emerald-800 font-bold">READY</span>
-                  </button>
-                )}
               </div>
             </div>
 
