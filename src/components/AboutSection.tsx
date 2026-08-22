@@ -115,7 +115,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
               </h3>
               
               <p className="text-slate-600 font-body text-sm sm:text-base leading-relaxed">
-                Headquartered in the vibrant trade city of <strong className="text-[#001233]">Coimbatore, Tamil Nadu</strong>, Arcaventure Global specializes in sourcing, processing, and exporting certified organic fresh vegetables, premium 1121 Basmati rice, handpicked Indian spices, and natural coconut by-products to international buyers across the Middle East, Europe, North America, and Asia-Pacific.
+                Headquartered in the vibrant trade city of <strong className="text-[#001233]">Pune</strong>, Arcaventure Global specializes in sourcing, processing, and exporting certified organic fresh vegetables, premium 1121 Basmati rice, handpicked Indian spices, and natural coconut by-products to international buyers across the Middle East, Europe, North America, and Asia-Pacific.
               </p>
 
               <p className="text-slate-600 font-body text-xs sm:text-sm leading-relaxed">
