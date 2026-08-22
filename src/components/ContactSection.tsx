@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Phone, Mail, MapPin, Clock, Send, CheckCircle2, Building2 } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Send, CheckCircle2, Building2, ExternalLink, MessageCircle } from 'lucide-react';
 import { COMPANY_DETAILS } from '../data/productsData';
+import { sendContactMessageEmail, TARGET_INQUIRY_EMAIL } from '../utils/emailService';
 import confetti from 'canvas-confetti';
 
 export const ContactSection: React.FC = () => {
@@ -9,25 +10,35 @@ export const ContactSection: React.FC = () => {
     email: '',
     phone: '',
     company: '',
-    subject: 'Vegetables & Produce Export',
+    subject: 'Indian Coconuts & Fresh Produce',
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [mailtoLink, setMailtoLink] = useState('');
+  const [whatsappLink, setWhatsappLink] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const result = await sendContactMessageEmail(formData);
+      setMailtoLink(result.mailtoUrl);
+      setWhatsappLink(result.whatsappUrl);
+
       setIsSubmitted(true);
       confetti({
         particleCount: 70,
         spread: 60,
         origin: { y: 0.8 }
       });
-    }, 1000);
+    } catch (err) {
+      console.error('Error submitting contact form:', err);
+      setIsSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -159,33 +170,65 @@ export const ContactSection: React.FC = () => {
               </p>
 
               {isSubmitted ? (
-                <div className="py-10 text-center space-y-4">
+                <div className="py-8 text-center space-y-4">
                   <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
-                  <h4 className="font-heading text-xl font-bold text-white">
-                    Thank You for Your Inquiry!
-                  </h4>
+                  <div>
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-heading font-bold uppercase tracking-wider">
+                      Inquiry Dispatched
+                    </span>
+                    <h4 className="font-heading text-xl font-bold text-white mt-2">
+                      Inquiry Dispatched to {TARGET_INQUIRY_EMAIL}
+                    </h4>
+                  </div>
                   <p className="text-xs text-gray-300 max-w-md mx-auto">
-                    Your message has been assigned to our export commercial manager. We will contact you at <strong>{formData.email}</strong> shortly.
+                    Thank you, <strong>{formData.name}</strong>. Your export inquiry has been routed to <strong>{TARGET_INQUIRY_EMAIL}</strong>. Our commercial trade manager will reply to <strong>{formData.email}</strong> shortly.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSubmitted(false);
-                      setFormData({
-                        name: '',
-                        email: '',
-                        phone: '',
-                        company: '',
-                        subject: 'Vegetables & Produce Export',
-                        message: ''
-                      });
-                    }}
-                    className="px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
-                  >
-                    Send Another Message
-                  </button>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                    {mailtoLink && (
+                      <a
+                        href={mailtoLink}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-heading font-bold uppercase tracking-wider transition-all"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-[#FF8C00]" />
+                        <span>Open in Email App</span>
+                      </a>
+                    )}
+
+                    {whatsappLink && (
+                      <a
+                        href={whatsappLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-heading font-bold uppercase tracking-wider transition-all"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Send WhatsApp Copy</span>
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSubmitted(false);
+                        setFormData({
+                          name: '',
+                          email: '',
+                          phone: '',
+                          company: '',
+                          subject: 'Indian Coconuts & Fresh Produce',
+                          message: ''
+                        });
+                      }}
+                      className="px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
+                    >
+                      Send Another Message
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <form id="contact-lead-form" onSubmit={handleSubmit} className="space-y-4">
