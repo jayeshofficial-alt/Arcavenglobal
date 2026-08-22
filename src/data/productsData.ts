@@ -445,7 +445,7 @@ export const COMPANY_DETAILS = {
   contact: {
     phonePrimary: '+91 9860215449',
     whatsapp: '+919860215449',
-    emailPrimary: 'info@archavenglobal.com',
+    emailPrimary: 'info@arcavenglobal.com',
     emailSecondary: 'export@arcavenglobal.com',
     supportDesk: 'trade@arcavenglobal.com'
   },

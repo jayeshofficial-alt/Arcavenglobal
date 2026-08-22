@@ -33,6 +33,17 @@ export const ContactSection: React.FC = () => {
         spread: 60,
         origin: { y: 0.8 }
       });
+
+      // Promptly open WhatsApp directly in new tab
+      if (result.whatsappUrl) {
+        setTimeout(() => {
+          try {
+            window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
+          } catch (err) {
+            console.warn('Popup blocked, available via button:', err);
+          }
+        }, 600);
+      }
     } catch (err) {
       console.error('Error submitting contact form:', err);
       setIsSubmitted(true);

@@ -43,9 +43,19 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
         origin: { y: 0.6 }
       });
       setSubmitted(true);
+
+      // Promptly open WhatsApp directly in new tab with the filled quote details
+      if (result.whatsappUrl) {
+        setTimeout(() => {
+          try {
+            window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
+          } catch (err) {
+            console.warn('Popup blocked, available via button:', err);
+          }
+        }, 600);
+      }
     } catch (err) {
       console.error('Failed to submit quote:', err);
-      // Fallback
       setSubmitted(true);
     } finally {
       setIsSubmitting(false);
@@ -142,7 +152,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
           <div>
             <div className="flex items-center gap-1.5 text-[11px] font-heading font-bold uppercase tracking-widest text-[#FF8C00] mb-1">
               <Globe2 className="w-3.5 h-3.5" />
-              <span>International Trade Inquiry • info@archavenglobal.com</span>
+              <span>International Trade Inquiry • {TARGET_INQUIRY_EMAIL}</span>
             </div>
 
             <h2 className="font-heading text-2xl font-bold text-[#001233]">

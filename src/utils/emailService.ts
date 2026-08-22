@@ -1,9 +1,12 @@
 /**
- * Email Dispatch Service for Arcaventure Global
- * Dispatches export quotes and inquiries to info@archavenglobal.com
+ * Email & WhatsApp Dispatch Service for Arcaventure Global
+ * Dispatches export quotes and inquiries to info@arcavenglobal.com
+ * and routes WhatsApp details to +91 9860215449
  */
 
-export const TARGET_INQUIRY_EMAIL = 'info@archavenglobal.com';
+export const TARGET_INQUIRY_EMAIL = 'info@arcavenglobal.com';
+export const TARGET_WHATSAPP_NUMBER = '919860215449';
+export const TARGET_WHATSAPP_DISPLAY = '+91 9860215449';
 
 export interface QuickQuotePayload {
   name: string;
@@ -42,41 +45,77 @@ export interface ContactMessagePayload {
 }
 
 /**
- * Dispatch Quick Quote to info@archavenglobal.com
+ * Helper to open WhatsApp URL in a new window/tab safely
  */
-export async function sendQuickQuoteEmail(payload: QuickQuotePayload): Promise<{ success: boolean; message?: string; mailtoUrl: string; whatsappUrl: string }> {
-  const subject = `[EXPORT QUOTE REQUEST] ${payload.product} - ${payload.company || payload.name}`;
+export function openWhatsAppDirect(url: string) {
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (err) {
+    console.warn('Could not auto-open WhatsApp:', err);
+  }
+}
+
+/**
+ * Dispatch Quick Quote to info@arcavenglobal.com & WhatsApp +91 9860215449
+ */
+export async function sendQuickQuoteEmail(payload: QuickQuotePayload): Promise<{
+  success: boolean;
+  mailtoUrl: string;
+  whatsappUrl: string;
+  summaryText: string;
+}> {
+  const subject = `[EXPORT INQUIRY] ${payload.product} (${payload.quantity}) - ${payload.company || payload.name}`;
   
   const bodyText = `
-NEW EXPORT QUOTE REQUEST (Via Arcaventure Global Portal)
--------------------------------------------------------
-Recipient: ${TARGET_INQUIRY_EMAIL}
-Date/Time: ${new Date().toLocaleString()}
+NEW EXPORT QUOTE & ORDER INQUIRY
+===========================================
+To: ${TARGET_INQUIRY_EMAIL}
+Date: ${new Date().toLocaleString()}
 
-BUYER PROFILE:
-- Name: ${payload.name}
-- Company: ${payload.company || 'Not Specified'}
-- Corporate Email: ${payload.email}
-- WhatsApp / Phone: ${payload.phone}
+BUYER / IMPORTER DETAILS:
+-------------------------------------------
+• Full Name: ${payload.name}
+• Company / Organization: ${payload.company || 'Not Specified'}
+• Corporate Email: ${payload.email}
+• Phone / WhatsApp: ${payload.phone}
 
-COMMERCIAL ORDER SPECIFICATIONS:
-- Product Required: ${payload.product}
-- Estimated Volume: ${payload.quantity}
-- Pricing Basis / Incoterm: ${payload.incoterm}
-- Destination Port: ${payload.destinationPort || 'Not Specified'}
+COMMERCIAL ORDER REQUIREMENTS:
+-------------------------------------------
+• Commodity / Product: ${payload.product}
+• Required Volume / Qty: ${payload.quantity}
+• Desired Incoterm: ${payload.incoterm}
+• Destination Port of Discharge: ${payload.destinationPort || 'Not Specified'}
 
-ADDITIONAL SPECIFICATIONS / PACKAGING NOTES:
-${payload.message || 'No additional notes provided.'}
+SPECIFICATIONS & SPECIAL INSTRUCTIONS:
+-------------------------------------------
+${payload.message || 'No additional custom packaging instructions provided.'}
 
--------------------------------------------------------
-This inquiry was submitted from the official Arcaventure Global web portal.
+===========================================
+Source: Arcaventure Global Web Portal (Shop Now / Request Quote)
 `.trim();
 
   const mailtoUrl = `mailto:${TARGET_INQUIRY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
-  const whatsappUrl = `https://wa.me/919860215449?text=${encodeURIComponent(`*New Quote Inquiry for ${payload.product}*\nName: ${payload.name}\nCompany: ${payload.company}\nEmail: ${payload.email}\nPhone: ${payload.phone}\nVolume: ${payload.quantity}\nIncoterm: ${payload.incoterm} (${payload.destinationPort})\nNotes: ${payload.message || 'N/A'}`)}`;
 
+  const whatsappMessage = `*NEW EXPORT QUOTE REQUEST - ARCAVENTURE GLOBAL*
+----------------------------------------
+*Product:* ${payload.product}
+*Volume / Quantity:* ${payload.quantity}
+*Incoterm:* ${payload.incoterm}
+*Destination Port:* ${payload.destinationPort || 'Not specified'}
+
+*Buyer:* ${payload.name}
+*Company:* ${payload.company || 'Direct Buyer'}
+*Email:* ${payload.email}
+*Phone:* ${payload.phone}
+${payload.message ? `*Notes:* ${payload.message}` : ''}
+----------------------------------------
+_Please send proforma invoice to ${payload.email}_`;
+
+  const whatsappUrl = `https://wa.me/${TARGET_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
+
+  // Send via AJAX to FormSubmit
   try {
-    const response = await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
+    await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,63 +130,86 @@ This inquiry was submitted from the official Arcaventure Global web portal.
         'Company': payload.company || 'N/A',
         'Buyer Email': payload.email,
         'Phone / WhatsApp': payload.phone,
-        'Product Requested': payload.product,
-        'Order Quantity': payload.quantity,
+        'Commodity': payload.product,
+        'Volume / Quantity': payload.quantity,
         'Incoterm': payload.incoterm,
         'Destination Port': payload.destinationPort || 'N/A',
-        'Packaging & Specs Notes': payload.message || 'N/A',
-        'Portal Source': 'Quick Quote / Shop Now Form'
+        'Notes & Specifications': payload.message || 'N/A',
+        'Timestamp': new Date().toISOString()
       })
     });
-
-    if (response.ok) {
-      return { success: true, mailtoUrl, whatsappUrl };
-    }
   } catch (err) {
-    console.warn('FormSubmit network dispatch error, fallback prepared:', err);
+    console.warn('Network submission notice:', err);
   }
 
-  return { success: true, mailtoUrl, whatsappUrl };
+  return {
+    success: true,
+    mailtoUrl,
+    whatsappUrl,
+    summaryText: `${payload.product} (${payload.quantity}) for ${payload.name}`
+  };
 }
 
 /**
- * Dispatch RFQ Cart Basket to info@archavenglobal.com
+ * Dispatch RFQ Cart Basket to info@arcavenglobal.com & WhatsApp +91 9860215449
  */
-export async function sendRfqCartEmail(payload: RfqCartPayload): Promise<{ success: boolean; message?: string; mailtoUrl: string; whatsappUrl: string }> {
-  const subject = `[OFFICIAL EXPORT RFQ] ${payload.items.length} Product(s) - ${payload.buyerCompany || payload.buyerName}`;
+export async function sendRfqCartEmail(payload: RfqCartPayload): Promise<{
+  success: boolean;
+  mailtoUrl: string;
+  whatsappUrl: string;
+  summaryText: string;
+}> {
+  const subject = `[OFFICIAL RFQ BASKET] ${payload.items.length} Product(s) - ${payload.buyerCompany || payload.buyerName}`;
   
   const productListSummary = payload.items
-    .map((item, idx) => `${idx + 1}. ${item.name} | Qty: ${item.quantity} ${item.unit} | Pack: ${item.packaging || 'Standard Export'}`)
+    .map((item, idx) => `${idx + 1}. ${item.name} | Qty: ${item.quantity} ${item.unit} | Pack: ${item.packaging || 'Export Standard'}`)
     .join('\n');
 
   const bodyText = `
 OFFICIAL EXPORT RFQ BASKET INQUIRY
--------------------------------------------------------
-Recipient: ${TARGET_INQUIRY_EMAIL}
-Date/Time: ${new Date().toLocaleString()}
+===========================================
+To: ${TARGET_INQUIRY_EMAIL}
+Date: ${new Date().toLocaleString()}
 
 BUYER PROFILE:
-- Full Name: ${payload.buyerName}
-- Company: ${payload.buyerCompany || 'Not Specified'}
-- Corporate Email: ${payload.buyerEmail}
-- WhatsApp / Phone: ${payload.buyerPhone}
+-------------------------------------------
+• Full Name: ${payload.buyerName}
+• Company: ${payload.buyerCompany || 'Not Specified'}
+• Corporate Email: ${payload.buyerEmail}
+• Phone / WhatsApp: ${payload.buyerPhone}
 
-TRADE LOGISTICS:
-- Incoterm: ${payload.incoterm}
-- Destination Port: ${payload.destinationPort || 'Not Specified'}
+LOGISTICS & DISCHARGE:
+-------------------------------------------
+• Incoterm: ${payload.incoterm}
+• Destination Port: ${payload.destinationPort || 'Not Specified'}
 
-REQUESTED EXPORT PRODUCTS (${payload.items.length}):
+REQUESTED EXPORT COMMODITIES (${payload.items.length}):
+-------------------------------------------
 ${productListSummary}
 
--------------------------------------------------------
-Please issue proforma invoice and export schedule to ${payload.buyerEmail}.
+===========================================
+Please issue official proforma invoice and export shipment schedule to ${payload.buyerEmail}.
 `.trim();
 
   const mailtoUrl = `mailto:${TARGET_INQUIRY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
-  const whatsappUrl = `https://wa.me/919860215449?text=${encodeURIComponent(`*Export RFQ Basket from ${payload.buyerName} (${payload.buyerCompany})*\nEmail: ${payload.buyerEmail}\nPhone: ${payload.buyerPhone}\nIncoterm: ${payload.incoterm} - Port: ${payload.destinationPort}\n\n*Products:*\n${productListSummary}`)}`;
+
+  const whatsappMessage = `*OFFICIAL EXPORT RFQ BASKET - ARCAVENTURE GLOBAL*
+----------------------------------------
+*Buyer:* ${payload.buyerName}
+*Company:* ${payload.buyerCompany || 'Importer'}
+*Email:* ${payload.buyerEmail}
+*Phone:* ${payload.buyerPhone}
+*Incoterm:* ${payload.incoterm} (Port: ${payload.destinationPort || 'Pending'})
+
+*Requested Products (${payload.items.length}):*
+${productListSummary}
+----------------------------------------
+_Forwarded to ${TARGET_INQUIRY_EMAIL}_`;
+
+  const whatsappUrl = `https://wa.me/${TARGET_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
 
   try {
-    const response = await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
+    await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,53 +223,76 @@ Please issue proforma invoice and export schedule to ${payload.buyerEmail}.
         'Buyer Name': payload.buyerName,
         'Company': payload.buyerCompany || 'N/A',
         'Email': payload.buyerEmail,
-        'Phone / WhatsApp': payload.buyerPhone,
+        'Phone': payload.buyerPhone,
         'Incoterm': payload.incoterm,
         'Destination Port': payload.destinationPort || 'N/A',
-        'Products List': productListSummary,
-        'Portal Source': 'RFQ Basket Drawer'
+        'Commodities Requested': productListSummary,
+        'Total Product Count': payload.items.length,
+        'Timestamp': new Date().toISOString()
       })
     });
-
-    if (response.ok) {
-      return { success: true, mailtoUrl, whatsappUrl };
-    }
   } catch (err) {
-    console.warn('FormSubmit network dispatch error, fallback prepared:', err);
+    console.warn('Network submission notice:', err);
   }
 
-  return { success: true, mailtoUrl, whatsappUrl };
+  return {
+    success: true,
+    mailtoUrl,
+    whatsappUrl,
+    summaryText: `${payload.items.length} items for ${payload.buyerName}`
+  };
 }
 
 /**
- * Dispatch Contact Form Message to info@archavenglobal.com
+ * Dispatch Contact Form Message to info@arcavenglobal.com & WhatsApp +91 9860215449
  */
-export async function sendContactMessageEmail(payload: ContactMessagePayload): Promise<{ success: boolean; message?: string; mailtoUrl: string; whatsappUrl: string }> {
+export async function sendContactMessageEmail(payload: ContactMessagePayload): Promise<{
+  success: boolean;
+  mailtoUrl: string;
+  whatsappUrl: string;
+}> {
   const subject = `[TRADE INQUIRY] ${payload.subject} - ${payload.company || payload.name}`;
   
   const bodyText = `
-NEW EXPORT INQUIRY MESSAGE
--------------------------------------------------------
-Recipient: ${TARGET_INQUIRY_EMAIL}
-Date/Time: ${new Date().toLocaleString()}
+EXPORT INQUIRY & TRADE MESSAGE
+===========================================
+To: ${TARGET_INQUIRY_EMAIL}
+Date: ${new Date().toLocaleString()}
 
-SENDER DETAILS:
-- Full Name: ${payload.name}
-- Email: ${payload.email}
-- Phone / WhatsApp: ${payload.phone}
-- Company: ${payload.company || 'Not Specified'}
-- Subject: ${payload.subject}
+SENDER INFORMATION:
+-------------------------------------------
+• Name: ${payload.name}
+• Email: ${payload.email}
+• Phone / WhatsApp: ${payload.phone}
+• Company: ${payload.company || 'Not Specified'}
+• Subject: ${payload.subject}
 
-MESSAGE CONTENT:
+MESSAGE DETAILS:
+-------------------------------------------
 ${payload.message}
--------------------------------------------------------
+
+===========================================
+Source: Arcaventure Global Contact Portal
 `.trim();
 
   const mailtoUrl = `mailto:${TARGET_INQUIRY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
-  const whatsappUrl = `https://wa.me/919860215449?text=${encodeURIComponent(`*Trade Inquiry: ${payload.subject}*\nFrom: ${payload.name} (${payload.company || 'N/A'})\nEmail: ${payload.email}\nPhone: ${payload.phone}\nMessage: ${payload.message}`)}`;
+
+  const whatsappMessage = `*TRADE INQUIRY - ARCAVENTURE GLOBAL*
+----------------------------------------
+*From:* ${payload.name} (${payload.company || 'Direct Contact'})
+*Email:* ${payload.email}
+*Phone:* ${payload.phone}
+*Subject:* ${payload.subject}
+
+*Message:*
+${payload.message}
+----------------------------------------
+_Please reply to ${payload.email}_`;
+
+  const whatsappUrl = `https://wa.me/${TARGET_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
 
   try {
-    const response = await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
+    await fetch(`https://formsubmit.co/ajax/${TARGET_INQUIRY_EMAIL}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,16 +309,16 @@ ${payload.message}
         'Company': payload.company || 'N/A',
         'Subject': payload.subject,
         'Message': payload.message,
-        'Portal Source': 'Contact Us Section'
+        'Timestamp': new Date().toISOString()
       })
     });
-
-    if (response.ok) {
-      return { success: true, mailtoUrl, whatsappUrl };
-    }
   } catch (err) {
-    console.warn('FormSubmit network dispatch error, fallback prepared:', err);
+    console.warn('Network submission notice:', err);
   }
 
-  return { success: true, mailtoUrl, whatsappUrl };
+  return {
+    success: true,
+    mailtoUrl,
+    whatsappUrl
+  };
 }

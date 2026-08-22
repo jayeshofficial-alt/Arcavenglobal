@@ -65,6 +65,17 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
       });
 
       setSubmitted(true);
+
+      // Promptly open WhatsApp directly in new tab with the basket details
+      if (result.whatsappUrl) {
+        setTimeout(() => {
+          try {
+            window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
+          } catch (err) {
+            console.warn('Popup blocked, available via button:', err);
+          }
+        }, 600);
+      }
     } catch (err) {
       console.error('Error submitting RFQ basket:', err);
       setSubmitted(true);
