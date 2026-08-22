@@ -99,7 +99,7 @@ export const Footer: React.FC = () => {
                 <MapPin className="w-3.5 h-3.5" />
               </div>
               <span className="text-gray-400 text-xs leading-relaxed">
-                {COMPANY_DETAILS.headquarters.addressLine1}, {COMPANY_DETAILS.headquarters.addressLine2}, {COMPANY_DETAILS.headquarters.state}, {COMPANY_DETAILS.headquarters.country} - {COMPANY_DETAILS.headquarters.pincode}
+                {COMPANY_DETAILS.headquarters.addressLine1}, {COMPANY_DETAILS.headquarters.addressLine2}, India - {COMPANY_DETAILS.headquarters.pincode}
               </span>
             </div>
 

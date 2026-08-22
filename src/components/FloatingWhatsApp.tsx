@@ -3,7 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { COMPANY_DETAILS } from '../data/productsData';
 
 export const FloatingWhatsApp: React.FC = () => {
-  const whatsappUrl = `https://wa.me/${COMPANY_DETAILS.contact.whatsapp.replace(/\+/g, '')}?text=${encodeURIComponent('Hello Arcaventure Global Export Desk, I would like to inquire about organic food export quotations and product availability.')}`;
+  const whatsappUrl = `https://wa.me/${COMPANY_DETAILS.contact.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hello Arcaventure Global Export Desk, I would like to inquire about organic food export quotations and product availability.')}`;
 
   return (
     <div className="fixed bottom-6 right-6 z-40 flex items-center group font-body">

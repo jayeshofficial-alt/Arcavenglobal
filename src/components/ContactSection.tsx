@@ -44,7 +44,7 @@ export const ContactSection: React.FC = () => {
             Initiate Your <span className="text-[#FF8C00] italic font-serif">Commercial</span> Inquiry
           </h2>
           <p className="mt-3 text-sm sm:text-base text-gray-300 font-body max-w-2xl mx-auto">
-            Request proforma invoices, bulk container shipping schedules, or lab assay certificates directly from our Coimbatore trade office.
+            Request proforma invoices, bulk container shipping schedules, or lab assay certificates directly from our Pune trade office.
           </p>
           <div className="w-12 h-1 bg-[#FF8C00] mx-auto mt-4 rounded-full" />
         </div>
@@ -63,8 +63,8 @@ export const ContactSection: React.FC = () => {
               <p className="text-sm font-bold text-white mt-1">
                 {COMPANY_DETAILS.contact.phonePrimary}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Landline: {COMPANY_DETAILS.contact.phoneSecondary}
+              <p className="text-[11px] text-emerald-400 mt-0.5 font-medium">
+                Direct WhatsApp Export Desk Active
               </p>
             </div>
           </div>
@@ -114,8 +114,8 @@ export const ContactSection: React.FC = () => {
             {/* Google Maps Iframe */}
             <div className="relative h-64 sm:h-72 w-full bg-slate-800">
               <iframe
-                title="Arcaventure Global Coimbatore Office Map"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.143714652787!2d76.94528147481977!3d11.027872089136192!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba85856b3e1c667%3A0xb3551db7f7b32d2f!2sNSR%20Rd%2C%20Saibaba%20Colony%2C%20Coimbatore%2C%20Tamil%20Nadu%20641011!5e0!3m2!1sen!2sin!4v1716500000000!5m2!1sen!2sin"
+                title="Arcaventure Global Pimple Gurav Pune Office Map"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15128.468249673406!2d73.8055416!3d18.5910398!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2b881335b3765%3A0xe21553c2b87fcf95!2sPimple%20Gurav%2C%20Pimpri-Chinchwad%2C%20Maharashtra%20411061!5e0!3m2!1sen!2sin!4v1716500000000!5m2!1sen!2sin"
                 className="w-full h-full border-0 filter contrast-[1.05] opacity-90 hover:opacity-100 transition-opacity"
                 allowFullScreen={false}
                 loading="lazy"
@@ -124,7 +124,7 @@ export const ContactSection: React.FC = () => {
               
               <div className="absolute top-3 left-3 bg-[#001233]/90 backdrop-blur-xs px-3 py-1 rounded border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 shadow-xs">
                 <Building2 className="w-3.5 h-3.5 text-[#FF8C00]" />
-                <span>Head Office: Coimbatore, India</span>
+                <span>Head Office: Pimple Gurav, Pune - 411061</span>
               </div>
             </div>
 
@@ -141,9 +141,9 @@ export const ContactSection: React.FC = () => {
                 <div className="font-bold text-white flex items-center gap-1.5">
                   <span>⚓ Major Export Seaports & Air Cargo:</span>
                 </div>
-                <p>• Tuticorin (V.O.C Port) – 180 km from Packing Hub</p>
-                <p>• Cochin Port (ICTT) – 190 km via NH544</p>
-                <p>• Coimbatore International Air Cargo (CJB)</p>
+                <p>• Nhava Sheva (JNPT Mumbai) – Direct Gateway</p>
+                <p>• Mumbai Port & Inland Container Depot (ICD Pune)</p>
+                <p>• Pune International Air Cargo & CSMIA Mumbai</p>
               </div>
             </div>
           </div>

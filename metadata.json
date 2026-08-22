@@ -2,5 +2,7 @@
   "name": "Arcaventure Global - Organic Food Export & Import",
   "description": "Premium single-page e-commerce and international trade portal for Arcaventure Global, specialized in healthy organic fresh vegetables, grains, spices, coconuts, and global nutrition export.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

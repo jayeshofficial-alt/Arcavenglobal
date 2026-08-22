@@ -435,17 +435,16 @@ export const COMPANY_DETAILS = {
   domain: 'arcavenglobal.com',
   establishedYear: '2012',
   headquarters: {
-    addressLine1: '#63, ARPEE CENTER, #320 NSR Road',
-    addressLine2: 'Saibaba Colony, Coimbatore',
-    state: 'Tamil Nadu, India',
-    pincode: '641011',
+    addressLine1: 'Pimple Gurav',
+    addressLine2: 'Pune, Maharashtra',
+    state: 'Maharashtra, India',
+    pincode: '411061',
     country: 'India'
   },
-  exportPorts: ['V.O. Chidambaranar Port (Tuticorin)', 'Cochin Port (ICTT Vallarpadam)', 'Chennai Port', 'Nhava Sheva (JNPT)'],
+  exportPorts: ['Nhava Sheva (JNPT Mumbai)', 'Mumbai Port (ICD Pune)', 'V.O. Chidambaranar Port (Tuticorin)', 'Cochin Port (ICTT Vallarpadam)', 'Chennai Port'],
   contact: {
     phonePrimary: '+91 9860215449',
-    phoneSecondary: '+91 9860215449',
-    whatsapp: '+91 9860215449',
+    whatsapp: '+919860215449',
     emailPrimary: 'export@arcavenglobal.com',
     emailSecondary: 'info@arcavenglobal.com',
     supportDesk: 'trade@arcavenglobal.com'
