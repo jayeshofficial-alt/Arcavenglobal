@@ -443,9 +443,9 @@ export const COMPANY_DETAILS = {
   },
   exportPorts: ['V.O. Chidambaranar Port (Tuticorin)', 'Cochin Port (ICTT Vallarpadam)', 'Chennai Port', 'Nhava Sheva (JNPT)'],
   contact: {
-    phonePrimary: '+91 99444 75341',
-    phoneSecondary: '+91 422 2445890',
-    whatsapp: '+919944475341',
+    phonePrimary: '+91 9860215449',
+    phoneSecondary: '+91 9860215449',
+    whatsapp: '+91 9860215449',
     emailPrimary: 'export@arcavenglobal.com',
     emailSecondary: 'info@arcavenglobal.com',
     supportDesk: 'trade@arcavenglobal.com'
