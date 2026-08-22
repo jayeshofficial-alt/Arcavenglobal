@@ -1,8 +1,12 @@
 import React from 'react';
 import { COMPANY_DETAILS } from '../data/productsData';
-import { ArrowUp, Phone, Mail, MapPin, Globe } from 'lucide-react';
+import { ArrowUp, Phone, Mail, MapPin, Globe, Smartphone, Download } from 'lucide-react';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  onOpenPlayStoreGuide?: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenPlayStoreGuide }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -28,8 +32,20 @@ export const Footer: React.FC = () => {
               Arcaventure Global (arcavenglobal.com) is an Indian merchant exporter supplying certified organic fresh produce, grains, spices, and coconut derivatives across 38+ countries with strict phytosanitary quality protocols.
             </p>
 
-            <div className="text-[11px] text-[#2D5A27] bg-[#2D5A27]/20 border border-[#2D5A27]/40 px-3 py-1 rounded inline-block font-semibold">
-              ISO 9001:2015 & APEDA Registered Exporter
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[11px] text-[#2D5A27] bg-[#2D5A27]/20 border border-[#2D5A27]/40 px-3 py-1 rounded inline-block font-semibold">
+                ISO 9001:2015 & APEDA Registered Exporter
+              </div>
+
+              {onOpenPlayStoreGuide && (
+                <button
+                  onClick={onOpenPlayStoreGuide}
+                  className="text-[11px] text-amber-300 bg-amber-500/20 border border-amber-500/40 px-3 py-1 rounded inline-flex items-center gap-1 font-semibold hover:bg-amber-500/30 transition-colors cursor-pointer"
+                >
+                  <Smartphone className="w-3 h-3 text-amber-400" />
+                  <span>Google Play App & Guide</span>
+                </button>
+              )}
             </div>
 
             {/* Social Text Badges (Editorial Style) */}
@@ -85,6 +101,17 @@ export const Footer: React.FC = () => {
               <li><a href="#quality" className="hover:text-[#FF8C00] transition-colors">Quality Protocol</a></li>
               <li><a href="#gallery" className="hover:text-[#FF8C00] transition-colors">Photo Gallery</a></li>
               <li><a href="#contact" className="hover:text-[#FF8C00] transition-colors">Contact Trade Desk</a></li>
+              {onOpenPlayStoreGuide && (
+                <li>
+                  <button
+                    onClick={onOpenPlayStoreGuide}
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-semibold cursor-pointer"
+                  >
+                    <Smartphone className="w-3 h-3" />
+                    <span>Android App / Play Store</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -150,3 +177,4 @@ export const Footer: React.FC = () => {
     </footer>
   );
 };
+

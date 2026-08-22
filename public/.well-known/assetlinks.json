@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.arcavenglobal.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0F:52:AB:70:E7:F8:8C:8B:77:24:94:4A:27:0B:D6:75:A7:28:B6:53:C9:8D:1C:86:1B:18:7C:E6"
+      ]
+    }
+  }
+]

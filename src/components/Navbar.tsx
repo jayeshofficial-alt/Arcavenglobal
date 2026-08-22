@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X, Globe2 } from 'lucide-react';
+import { ShoppingBag, Menu, X, Smartphone, Globe2 } from 'lucide-react';
 import { RfqItem } from '../types';
 
 interface NavbarProps {
   cartItems: RfqItem[];
   onOpenCart: () => void;
   onOpenQuickQuote: () => void;
+  onOpenPlayStoreGuide?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   cartItems,
   onOpenCart,
-  onOpenQuickQuote
+  onOpenQuickQuote,
+  onOpenPlayStoreGuide
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             : 'bg-white border-b border-gray-100'
         }`}
       >
-        <div className="w-full max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between">
           {/* Editorial Brand Logo */}
           <a
             id="header-logo-link"
@@ -92,8 +94,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </a>
 
           {/* Desktop Navigation Links (Editorial uppercase & spacing) */}
-          <nav className="hidden lg:flex items-center gap-8">
-            <div className="flex gap-6 text-[13px] font-semibold text-[#001233]/70">
+          <nav className="hidden lg:flex items-center gap-6 xl:gap-8">
+            <div className="flex gap-5 xl:gap-6 text-[13px] font-semibold text-[#001233]/70">
               {navLinks.map((link) => {
                 const isActive = activeSection === link.id;
                 return (
@@ -117,12 +119,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               })}
             </div>
 
-            <div className="flex items-center gap-4 pl-2 border-l border-gray-100">
+            <div className="flex items-center gap-3 pl-3 border-l border-gray-100">
+              {/* Play Store App Hub Button */}
+              {onOpenPlayStoreGuide && (
+                <button
+                  id="header-play-store-btn"
+                  onClick={onOpenPlayStoreGuide}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#2D5A27] text-xs font-heading font-bold uppercase tracking-wider transition-all border border-emerald-200 cursor-pointer"
+                  title="Google Play Store & Mobile App Publishing"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Play App</span>
+                </button>
+              )}
+
               {/* RFQ Cart Icon */}
               <button
                 id="cart-drawer-trigger"
                 onClick={onOpenCart}
-                className="relative p-2 text-[#001233]/80 hover:text-[#FF8C00] transition-colors rounded-lg hover:bg-gray-50"
+                className="relative p-2 text-[#001233]/80 hover:text-[#FF8C00] transition-colors rounded-lg hover:bg-gray-50 cursor-pointer"
                 title="View Sample Order / RFQ Basket"
                 aria-label="View quotation cart"
               >
@@ -138,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="header-cta-quote-btn"
                 onClick={onOpenQuickQuote}
-                className="bg-[#FF8C00] hover:bg-[#e67e00] text-white px-6 py-2 rounded-full font-heading text-[12px] font-bold tracking-wider uppercase orange-glow transition-all duration-200 active:scale-95 cursor-pointer"
+                className="bg-[#FF8C00] hover:bg-[#e67e00] text-white px-5 py-2 rounded-full font-heading text-[12px] font-bold tracking-wider uppercase orange-glow transition-all duration-200 active:scale-95 cursor-pointer"
               >
                 SHOP NOW
               </button>
@@ -146,7 +161,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Mobile Right Controls */}
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-1.5 lg:hidden">
+            {onOpenPlayStoreGuide && (
+              <button
+                onClick={onOpenPlayStoreGuide}
+                className="p-1.5 rounded-full bg-emerald-50 text-[#2D5A27] border border-emerald-200 text-xs font-bold flex items-center gap-1"
+                aria-label="Play Store App"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span className="text-[10px] font-heading hidden sm:inline">App</span>
+              </button>
+            )}
+
             <button
               id="mobile-cart-btn"
               onClick={onOpenCart}
@@ -216,6 +242,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {link.name}
                   </a>
                 ))}
+
+                {onOpenPlayStoreGuide && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenPlayStoreGuide();
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-lg text-sm font-semibold font-heading text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors flex items-center justify-between mt-2"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4" />
+                      <span>Google Play Store & Mobile App</span>
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-200 text-emerald-800 font-bold">READY</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -226,13 +268,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setMobileMenuOpen(false);
                   onOpenQuickQuote();
                 }}
-                className="w-full py-3 rounded-full bg-[#FF8C00] text-white font-heading font-bold text-xs uppercase tracking-wider orange-glow text-center shadow-md transition-colors"
+                className="w-full py-3 rounded-full bg-[#FF8C00] text-white font-heading font-bold text-xs uppercase tracking-wider orange-glow text-center shadow-md transition-colors cursor-pointer"
               >
                 REQUEST EXPORT QUOTE
               </button>
 
               <div className="text-[11px] text-gray-500 text-center space-y-1">
-                <p className="font-semibold text-slate-700">Coimbatore, Tamil Nadu, India</p>
+                <p className="font-semibold text-slate-700">Pimple Gurav, Pune - 411061, Maharashtra, India</p>
                 <p>ISO 9001:2015 & APEDA Certified Exporter</p>
               </div>
             </div>
@@ -242,3 +284,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </>
   );
 };
+

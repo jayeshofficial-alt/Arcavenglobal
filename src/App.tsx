@@ -17,6 +17,9 @@ import { Footer } from './components/Footer';
 import { RfqCartDrawer } from './components/RfqCartDrawer';
 import { QuickQuoteModal } from './components/QuickQuoteModal';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { MobileInstallBanner } from './components/MobileInstallBanner';
+import { PlayStoreGuideModal } from './components/PlayStoreGuideModal';
 import { ProductItem, RfqItem } from './types';
 
 export default function App() {
@@ -24,6 +27,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
+  const [isPlayStoreGuideOpen, setIsPlayStoreGuideOpen] = useState(false);
 
   // Add to Quote Basket
   const handleAddToCart = (
@@ -82,11 +86,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFCFB] text-[#1E293B]">
+      {/* Top Mobile PWA & Play Store Install Notification Banner */}
+      <MobileInstallBanner onOpenPlayStoreGuide={() => setIsPlayStoreGuideOpen(true)} />
+
       {/* Sticky Transparent-to-Solid Glassmorphism Navigation */}
       <Navbar
         cartItems={cartItems}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenQuickQuote={() => setIsQuickQuoteOpen(true)}
+        onOpenPlayStoreGuide={() => setIsPlayStoreGuideOpen(true)}
       />
 
       {/* Main Single-Page Sections */}
@@ -121,7 +129,15 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer onOpenPlayStoreGuide={() => setIsPlayStoreGuideOpen(true)} />
+
+      {/* Mobile Native-Style Bottom App Navigation Bar */}
+      <MobileBottomNav
+        cartItems={cartItems}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenQuickQuote={() => setIsQuickQuoteOpen(true)}
+        onOpenPlayStoreGuide={() => setIsPlayStoreGuideOpen(true)}
+      />
 
       {/* Product Detail "Learn More" Modal */}
       <ProductModal
@@ -146,8 +162,16 @@ export default function App() {
         onClose={() => setIsQuickQuoteOpen(false)}
       />
 
+      {/* Google Play Store & Android App Hub Modal */}
+      <PlayStoreGuideModal
+        isOpen={isPlayStoreGuideOpen}
+        onClose={() => setIsPlayStoreGuideOpen(false)}
+        onOpenQuickQuote={() => setIsQuickQuoteOpen(true)}
+      />
+
       {/* Floating WhatsApp Quick Connect */}
       <FloatingWhatsApp />
     </div>
   );
 }
+

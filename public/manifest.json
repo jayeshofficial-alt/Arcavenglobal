@@ -1,0 +1,51 @@
+{
+  "name": "Arcaventure Global - Food & Agro Export",
+  "short_name": "Arcaventure",
+  "description": "Official international trade & export app for Arcaventure Global. Source certified organic fresh vegetables, basmati rice, spices, coconuts, and get instant container quotes.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#001233",
+  "theme_color": "#001233",
+  "categories": ["business", "shopping", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Request Instant Quote",
+      "short_name": "Quote",
+      "description": "Calculate and request proforma export quotation",
+      "url": "/#quote",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Browse Export Catalog",
+      "short_name": "Catalog",
+      "description": "Explore fresh vegetables, coconuts, spices & grains",
+      "url": "/#products",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Trade WhatsApp Desk",
+      "short_name": "WhatsApp",
+      "description": "Connect directly with export manager",
+      "url": "https://wa.me/919860215449",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.arcavenglobal.app",
+      "id": "com.arcavenglobal.app"
+    }
+  ]
+}
