@@ -28,7 +28,7 @@ export const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <section id="home" className="pt-[70px] bg-white">
+    <section id="home" className="pt-[102px] sm:pt-[100px] bg-white">
       {/* Editorial Split Hero Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[540px] border-b border-gray-100">
         
@@ -219,11 +219,11 @@ export const Hero: React.FC<HeroProps> = ({
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-gray-500 font-medium">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-[#2D5A27]" />
-            <span>ISO 9001:2015 Registered Facility</span>
+            <span>FSSAI & Global GAP Standards</span>
           </div>
           <div className="flex items-center gap-2">
             <Award className="w-4 h-4 text-[#FF8C00]" />
-            <span>APEDA & Spices Board of India Certified</span>
+            <span>Spices Board of India Registered</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#2D5A27]" />

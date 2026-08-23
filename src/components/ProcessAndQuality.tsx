@@ -88,7 +88,7 @@ export const ProcessAndQuality: React.FC = () => {
 
                 <div className="mt-5 pt-3 border-t border-white/10 flex items-center gap-1.5 text-[11px] font-semibold text-[#2D5A27]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>ISO 9001:2015 Audited</span>
+                  <span>Quality Assurance Verified</span>
                 </div>
               </div>
             );

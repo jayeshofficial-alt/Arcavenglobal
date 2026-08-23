@@ -29,7 +29,7 @@ export const Footer: React.FC = () => {
             </p>
 
             <div className="text-[11px] text-[#2D5A27] bg-[#2D5A27]/20 border border-[#2D5A27]/40 px-3 py-1 rounded inline-block font-semibold">
-              ISO 9001:2015 & APEDA Registered Exporter
+              Certified Merchant Exporter • Global Quality Protocols
             </div>
 
             {/* Social Text Badges (Editorial Style) */}

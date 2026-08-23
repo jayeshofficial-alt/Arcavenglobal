@@ -391,7 +391,7 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
 
         {/* Drawer Footer */}
         <div className="p-3 bg-gray-50 border-t border-gray-200 text-center text-[11px] text-gray-500">
-          🔒 ISO 9001:2015 & APEDA Certified Export Desk • Fast Response Guaranteed
+          🔒 Verified Direct Agricultural Export Desk • Fast Response Guaranteed
         </div>
       </div>
     </div>

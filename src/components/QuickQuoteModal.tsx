@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Globe2, CheckCircle2, ShieldCheck, Mail, Send, ExternalLink, MessageCircle } from 'lucide-react';
+import { X, Globe2, CheckCircle2, ShieldCheck, Mail, Send, ExternalLink, MessageCircle, Edit3 } from 'lucide-react';
 import { PRODUCTS } from '../data/productsData';
 import { sendQuickQuoteEmail, TARGET_INQUIRY_EMAIL } from '../utils/emailService';
 import confetti from 'canvas-confetti';
@@ -21,6 +21,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
     destinationPort: '',
     message: ''
   });
+  const [customProduct, setCustomProduct] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [mailtoLink, setMailtoLink] = useState('');
@@ -28,12 +29,25 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
+  const isOtherSelected = formData.product === 'Other (Please specify)' || formData.product.startsWith('Other:');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isOtherSelected && !customProduct.trim()) {
+      return;
+    }
+
     setIsSubmitting(true);
 
+    const finalProduct = isOtherSelected
+      ? (customProduct.trim() ? `Other: ${customProduct.trim()}` : 'Other (Custom Product)')
+      : formData.product;
+
     try {
-      const result = await sendQuickQuoteEmail(formData);
+      const result = await sendQuickQuoteEmail({
+        ...formData,
+        product: finalProduct
+      });
       setMailtoLink(result.mailtoUrl);
       setWhatsappLink(result.whatsappUrl);
       
@@ -109,7 +123,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
                 <span>Forwarded to: <span className="text-[#FF8C00]">{TARGET_INQUIRY_EMAIL}</span></span>
               </div>
               <p className="text-gray-600 leading-relaxed font-body">
-                Thank you, <strong>{formData.name}</strong> ({formData.company || 'Buyer'}). A copy of your inquiry for <strong>{formData.product}</strong> ({formData.quantity}) has been routed to <strong>{TARGET_INQUIRY_EMAIL}</strong> and our team will issue an official proforma invoice to <strong>{formData.email}</strong> within 4 business hours.
+                Thank you, <strong>{formData.name}</strong> ({formData.company || 'Buyer'}). A copy of your inquiry for <strong>{isOtherSelected ? customProduct : formData.product}</strong> ({formData.quantity}) has been routed to <strong>{TARGET_INQUIRY_EMAIL}</strong> and our commercial desk will issue an official proforma invoice to <strong>{formData.email}</strong> within 4 business hours.
               </p>
             </div>
 
@@ -159,7 +173,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
               Request Export Price & Proforma
             </h2>
             <p className="text-xs text-gray-500 mt-1 mb-5 font-body">
-              Get direct container rates (FOB / CIF) and lab certificate assays directly at <strong>{TARGET_INQUIRY_EMAIL}</strong>.
+              Get direct container rates (FOB / CIF) and laboratory specs delivered directly from our export trade desk.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -223,7 +237,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
                 </div>
               </div>
 
-              {/* Product Selection */}
+              {/* Product Selection with 'Other (Please specify)' */}
               <div>
                 <label className="block text-[10px] font-heading font-bold uppercase tracking-wider text-gray-700 mb-1">
                   Product Required *
@@ -238,8 +252,33 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
                       {p.name} ({p.categoryLabel})
                     </option>
                   ))}
+                  <option value="Other (Please specify)">
+                    Other (Please specify)
+                  </option>
                 </select>
               </div>
+
+              {/* Conditional Text Box if User clicks Other (Please specify) */}
+              {isOtherSelected && (
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5 animate-fadeIn">
+                  <label className="block text-[10px] font-heading font-bold uppercase tracking-wider text-[#001233] flex items-center gap-1.5">
+                    <Edit3 className="w-3.5 h-3.5 text-[#FF8C00]" />
+                    <span>Please Specify Your Required Product / Commodity *</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter commodity name, botanical grade, or custom agricultural item..."
+                    value={customProduct}
+                    onChange={(e) => setCustomProduct(e.target.value)}
+                    className="w-full px-3 py-2 rounded border border-amber-300 bg-white text-xs font-body text-[#001233] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#FF8C00] focus:border-[#FF8C00]"
+                    autoFocus
+                  />
+                  <p className="text-[10px] text-gray-500 font-body">
+                    This specification will be transmitted directly in your official email and WhatsApp inquiry.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -321,7 +360,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
 
             <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
               <ShieldCheck className="w-3.5 h-3.5 text-[#2D5A27]" />
-              <span>APEDA & ISO 9001:2015 Verified • Inquiry received at {TARGET_INQUIRY_EMAIL}</span>
+              <span>Verified Export Desk • Direct communication to {TARGET_INQUIRY_EMAIL} & WhatsApp</span>
             </div>
           </div>
         )}
@@ -329,4 +368,5 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({ isOpen, onClos
     </div>
   );
 };
+
 

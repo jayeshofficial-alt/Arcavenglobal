@@ -20,7 +20,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 40ft High Cube Container (approx. 45,000 to 50,000 nuts)',
     loadAbility: '28 MT per 40ft HQ Reefer Container (1,800 to 2,000 bags)',
     exportPorts: ['Tuticorin Port (V.O.C)', 'Cochin Port', 'Chennai Port'],
-    certifications: ['ISO 9001:2015', 'APEDA', 'Coconut Development Board (CDB)', 'FSSAI', 'Phytosanitary Certified'],
+    certifications: ['Coconut Development Board (CDB)', 'FSSAI', 'Phytosanitary Certified'],
     highlights: ['Natural sweet kernel', 'High lauric acid profile', 'No chemical bleaching', 'Intact eye & water retention'],
     isFeatured: true
   },
@@ -42,7 +42,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (12.5 MT) / 1 x 40ft Reefer (28 MT)',
     loadAbility: '28 Metric Tons per 40ft Reefer Container',
     exportPorts: ['Nhava Sheva (JNPT)', 'Tuticorin Port', 'Chennai Port'],
-    certifications: ['APEDA Registered', 'Global GAP', 'FSSAI', 'Phytosanitary Certificate'],
+    certifications: ['Global GAP', 'FSSAI', 'Phytosanitary Certificate'],
     highlights: ['Firm bulb structure', 'Strong pungency & aroma', 'Zero sprout guarantee', 'Triple sorted & graded'],
     isFeatured: true
   },
@@ -64,7 +64,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft Reefer FCL (12 MT)',
     loadAbility: '25 MT per 40ft Reefer Container',
     exportPorts: ['Cochin Port', 'Tuticorin Port'],
-    certifications: ['USDA Organic', 'India Organic (NPOP)', 'APEDA', 'FSSAI'],
+    certifications: ['USDA Organic', 'India Organic (NPOP)', 'FSSAI', 'Phytosanitary Certificate'],
     highlights: ['High essential oil index', 'Clean unbroken fingers', 'Anti-fungal natural curing', 'Direct cold-chain export'],
     isFeatured: false
   },
@@ -86,7 +86,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft Reefer (approx. 9,000 pieces)',
     loadAbility: '20,000 to 22,000 nuts per 40ft Reefer Container',
     exportPorts: ['Tuticorin Port', 'Cochin Port', 'Air Cargo Coimbatore/Chennai'],
-    certifications: ['FSSAI', 'APEDA', 'Phytosanitary Certified'],
+    certifications: ['FSSAI', 'Phytosanitary Certified', 'Global GAP'],
     highlights: ['Rich in natural electrolytes', 'Brix sweetness 6.5 - 7.5°', 'Leak-proof protective packaging', 'Fast air & sea transit'],
     isFeatured: false
   },
@@ -110,7 +110,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (24 MT - 26 MT)',
     loadAbility: '26 Metric Tons per 20ft Heavy FCL',
     exportPorts: ['Mundra Port', 'Nhava Sheva (JNPT)', 'Kandla Port'],
-    certifications: ['ISO 22000:2018', 'APEDA Registered', 'BRCGS Food Safety', 'Halal Certified', 'US FDA Compliant'],
+    certifications: ['ISO 22000:2018', 'BRCGS Food Safety', 'Halal Certified', 'US FDA Compliant'],
     highlights: ['Average Raw Length: 8.35mm+', 'Cooked Length: 18mm - 20mm', 'Zero chalky grains', '100% Sortex clean'],
     isFeatured: true
   },
@@ -132,7 +132,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (25 MT)',
     loadAbility: '25 Metric Tons per 20ft FCL',
     exportPorts: ['Chennai Port', 'Krishnapatnam Port', 'Visakhapatnam Port'],
-    certifications: ['APEDA', 'ISO 9001:2015', 'FSSAI', 'Halal Certified'],
+    certifications: ['FSSAI', 'Halal Certified', 'Phytosanitary Certified'],
     highlights: ['Low Glycemic Index profile', 'Pleasant subtle aroma', 'Non-sticky texture', 'Strictly unadulterated'],
     isFeatured: false
   },
@@ -154,7 +154,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (24 MT)',
     loadAbility: '24 Metric Tons per 20ft Container',
     exportPorts: ['Nhava Sheva (JNPT)', 'Mundra Port'],
-    certifications: ['USDA Organic', 'APEDA Pulses Council', 'ISO 22000', 'Halal'],
+    certifications: ['USDA Organic', 'Pulses Board Certified', 'ISO 22000', 'Halal'],
     highlights: ['High vegetable protein (21%)', 'Creamy texture when cooked', 'Strictly non-GMO', 'Optical laser sorted'],
     isFeatured: true
   },
@@ -176,7 +176,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (24 MT)',
     loadAbility: '24 Metric Tons per 20ft Container',
     exportPorts: ['Nhava Sheva (JNPT)', 'Kandla Port'],
-    certifications: ['FSSAI', 'APEDA', 'ISO 9001:2015', 'Halal'],
+    certifications: ['FSSAI', 'Halal', 'Phytosanitary Certified'],
     highlights: ['Fast cooking (15 mins)', 'Rich natural carotenoids', 'Zero artificial colors', 'High dietary fiber'],
     isFeatured: false
   },
@@ -200,7 +200,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '5 Metric Tons (or mixed spice container)',
     loadAbility: '16 MT per 20ft FCL / 27 MT per 40ft FCL',
     exportPorts: ['Cochin Port', 'Tuticorin Port', 'Chennai Port'],
-    certifications: ['Spices Board of India Registered', 'USDA Organic', 'ISO 9001:2015', 'FSSAI', 'Halal'],
+    certifications: ['Spices Board of India Registered', 'USDA Organic', 'FSSAI', 'Halal'],
     highlights: ['4.75mm+ Bold Berries', 'Bulk density 570g/L minimum', 'Steam sterilized available', 'Direct farmer harvest'],
     isFeatured: true
   },
@@ -222,7 +222,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '500 kg for Air Cargo / 2 MT for Sea Freight',
     loadAbility: '10 MT per 20ft FCL / Air Cargo Palletized',
     exportPorts: ['Cochin Port', 'Air Cargo Kochi / Coimbatore / Chennai'],
-    certifications: ['Spices Board of India', 'APEDA', 'USDA Organic', 'Halal'],
+    certifications: ['Spices Board of India', 'USDA Organic', 'Halal', 'Phytosanitary Certified'],
     highlights: ['Vibrant natural emerald color', '8mm+ jumbo pods', 'Volatile oil 8.5%+', 'Zero sulfur treatment'],
     isFeatured: true
   },
@@ -244,7 +244,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 40ft High Cube Container (approx. 14 MT)',
     loadAbility: '14 MT per 40ft HQ Container (Jute Bales)',
     exportPorts: ['Chennai Port', 'Krishnapatnam Port'],
-    certifications: ['Spices Board of India', 'APEDA', 'FSSAI', 'Halal Certified'],
+    certifications: ['Spices Board of India', 'FSSAI', 'Halal Certified'],
     highlights: ['Scoville Heat: 40,000 to 75,000 SHU', 'Deep natural red ASTA', 'Aflatoxin & Pesticide Tested', 'Stemless machine clean'],
     isFeatured: false
   },
@@ -266,7 +266,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 20ft FCL (18 MT)',
     loadAbility: '18 MT per 20ft FCL / 27 MT per 40ft FCL',
     exportPorts: ['Tuticorin Port', 'Chennai Port', 'Cochin Port'],
-    certifications: ['USDA Organic', 'APEDA', 'Spices Board of India', 'Halal', 'ISO 9001:2015'],
+    certifications: ['USDA Organic', 'Spices Board of India', 'Halal', 'Phytosanitary Certified'],
     highlights: ['Curcumin potency 3.8% - 5.2%', 'No artificial color polishing', 'Unbroken firm fingers', 'Certified pesticide-free'],
     isFeatured: true
   },
@@ -312,7 +312,7 @@ export const PRODUCTS: ProductItem[] = [
     moq: '1 x 40ft High Cube Container (26 Metric Tons / ~5,200 blocks)',
     loadAbility: '26 Metric Tons per 40ft HC Container (20 Pallets)',
     exportPorts: ['Tuticorin Port (V.O.C)', 'Cochin Port'],
-    certifications: ['OMRI Listed (Organic Gardening)', 'Coir Board of India', 'Phytosanitary Certified', 'ISO 9001:2015'],
+    certifications: ['OMRI Listed (Organic Gardening)', 'Coir Board of India', 'Phytosanitary Certified'],
     highlights: ['High water retention: 700 - 800%', 'Expansion volume: 75L per 5kg block', 'pH optimized (5.8 - 6.5)', 'Weed seed & pathogen free'],
     isFeatured: false
   }
@@ -450,8 +450,6 @@ export const COMPANY_DETAILS = {
     supportDesk: 'trade@arcavenglobal.com'
   },
   certifications: [
-    { name: 'ISO 9001:2015', label: 'Quality Management Certified' },
-    { name: 'APEDA', label: 'Agricultural & Processed Food Products Export Authority' },
     { name: 'Spices Board India', label: 'Registered Spice Exporter' },
     { name: 'FSSAI', label: 'Food Safety & Standards Authority of India' },
     { name: 'USDA Organic', label: 'Certified Organic Standards' },
