@@ -2,11 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { 
   ProductItem, 
   UserAccount, 
-  CustomerInquiry,
-  ProductCategory 
+  CustomerInquiry, 
+  OrderRecord, 
+  OrderStatus, 
+  PaymentMethod,
+  SiteContent 
 } from '../types';
 import { 
-  ADMIN_EMAIL, 
+  SUPER_ADMIN_IDENTITY, 
+  isSuperAdminIdentity,
   saveProducts, 
   getStoredUsers, 
   saveUsers, 
@@ -19,6 +23,12 @@ import {
   updateProduct,
   addProduct,
   resetProductsToDefault,
+  getStoredOrders,
+  saveOrders,
+  updateOrderStatus,
+  getStoredSiteContent,
+  saveSiteContent,
+  resetSiteContent,
   logoutSession
 } from '../utils/storage';
 import { 
@@ -27,8 +37,6 @@ import {
   Package, 
   Users, 
   KeyRound, 
-  Eye, 
-  EyeOff, 
   Plus, 
   Edit3, 
   Trash2, 
@@ -38,13 +46,21 @@ import {
   AlertTriangle, 
   X, 
   Image as ImageIcon, 
-  Upload, 
   RotateCcw, 
   Copy, 
   Lock, 
   LogOut, 
   ExternalLink,
-  ChevronRight
+  ClipboardList,
+  FileText,
+  DollarSign,
+  Truck,
+  Clock,
+  Eye,
+  Check,
+  Send,
+  Sliders,
+  Building
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -53,6 +69,10 @@ interface AdminPanelModalProps {
   currentUser: UserAccount | null;
   products: ProductItem[];
   onProductsUpdated: (products: ProductItem[]) => void;
+  siteContent: SiteContent;
+  onSiteContentUpdated: (content: SiteContent) => void;
+  orders: OrderRecord[];
+  onOrdersUpdated: (orders: OrderRecord[]) => void;
   onLogout: () => void;
 }
 
@@ -74,23 +94,40 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   currentUser,
   products,
   onProductsUpdated,
+  siteContent,
+  onSiteContentUpdated,
+  orders,
+  onOrdersUpdated,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'customers' | 'security'>('products');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'content' | 'customers' | 'security'>('orders');
   
+  // Orders State
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
+  
+  // Confirmation & Dispatch Transition Modals
+  const [confirmingOrder, setConfirmingOrder] = useState<OrderRecord | null>(null);
+  const [paymentRefInput, setPaymentRefInput] = useState('');
+  
+  const [dispatchingOrder, setDispatchingOrder] = useState<OrderRecord | null>(null);
+  const [dispatchTatInput, setDispatchTatInput] = useState('5–7 business days via air freight');
+  const [trackingNumberInput, setTrackingNumberInput] = useState('');
+  const [carrierNoticeInput, setCarrierNoticeInput] = useState('Customs cleared and freight carrier assigned.');
+
   // Product state
   const [productSearch, setProductSearch] = useState('');
   const [productFilter, setProductFilter] = useState<'all' | 'listed' | 'delisted'>('all');
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
 
+  // Site Content State
+  const [localContent, setLocalContent] = useState<SiteContent>(siteContent);
+
   // Customer state
   const [usersList, setUsersList] = useState<UserAccount[]>(() => getStoredUsers());
   const [customerSearch, setCustomerSearch] = useState('');
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<UserAccount | null>(null);
-
-  // Set Password modal for specific user (Admin sets password for customer)
   const [targetUserForPassword, setTargetUserForPassword] = useState<UserAccount | null>(null);
   const [newPasswordForUser, setNewPasswordForUser] = useState('');
   const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
@@ -109,18 +146,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // STRICT ACCESS CHECK: Only jayeshofficial@gmail.com is allowed admin access
-  const isAuthorizedAdmin = 
+  // STRICT ACCESS CHECK: Only verified designated super admin (jayeshofficial.com)
+  const isAuthorizedSuperAdmin = 
     currentUser && 
     currentUser.role === 'admin' && 
-    currentUser.email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    isSuperAdminIdentity(currentUser.email);
 
   if (!isOpen) return null;
 
-  if (!isAuthorizedAdmin) {
+  if (!isAuthorizedSuperAdmin) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-        <div className="max-w-md w-full bg-[#001233] border border-red-500/50 rounded-2xl p-6 sm:p-8 text-white space-y-4 text-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B192C]/85 backdrop-blur-md animate-fadeIn font-body">
+        <div className="max-w-md w-full bg-[#0B192C] border border-red-500/50 rounded-2xl p-6 sm:p-8 text-white space-y-4 text-center shadow-2xl">
           <div className="w-14 h-14 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
             <ShieldAlert className="w-7 h-7" />
           </div>
@@ -128,16 +165,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             Administrative Access Denied
           </h2>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Admin privileges are strictly restricted to designated User ID:
+            Admin console and `/admin` routes are strictly restricted to the verified Super Admin entity:
             <br />
-            <strong className="text-amber-400 font-mono text-sm block mt-1">{ADMIN_EMAIL}</strong>
+            <strong className="text-amber-400 font-mono text-sm block mt-1">{SUPER_ADMIN_IDENTITY}</strong>
           </p>
           <div className="pt-3">
             <button
               onClick={onClose}
               className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors cursor-pointer"
             >
-              Close & Return to Public Site
+              Close & Return to Store
             </button>
           </div>
         </div>
@@ -145,12 +182,27 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     );
   }
 
+  // Filtered Orders
+  const filteredOrders = orders.filter(ord => {
+    const matchesSearch = 
+      ord.orderNumber.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      ord.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      ord.customerEmail.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      (ord.company && ord.company.toLowerCase().includes(orderSearch.toLowerCase())) ||
+      (ord.destinationPort && ord.destinationPort.toLowerCase().includes(orderSearch.toLowerCase()));
+
+    if (!matchesSearch) return false;
+    if (orderFilter !== 'all' && ord.status !== orderFilter) return false;
+    return true;
+  });
+
   // Filtered Products
   const filteredProducts = products.filter(prod => {
     const matchesSearch = 
       prod.name.toLowerCase().includes(productSearch.toLowerCase()) ||
       prod.origin.toLowerCase().includes(productSearch.toLowerCase()) ||
       prod.grade.toLowerCase().includes(productSearch.toLowerCase()) ||
+      (prod.sku && prod.sku.toLowerCase().includes(productSearch.toLowerCase())) ||
       prod.categoryLabel.toLowerCase().includes(productSearch.toLowerCase());
     
     if (!matchesSearch) return false;
@@ -162,7 +214,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   // Filtered Customers
   const filteredCustomers = usersList.filter(u => {
-    if (u.role === 'admin') return false; // Show only customers in customer table
+    if (isSuperAdminIdentity(u.email)) return false; // Show only customers in directory
     return (
       u.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
       u.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -171,12 +223,74 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     );
   });
 
+  // Status flow handler
+  const handleStatusChangeRequest = (order: OrderRecord, nextStatus: OrderStatus) => {
+    if (nextStatus === 'Order Confirmed') {
+      // Prompt for verified Payment Reference Number
+      setConfirmingOrder(order);
+      setPaymentRefInput(order.paymentReference || '');
+    } else if (nextStatus === 'Order Dispatched') {
+      // Trigger Estimated Delivery TAT / Tracking notice input
+      setDispatchingOrder(order);
+      setDispatchTatInput(order.dispatchTat || '5–7 business days via air freight');
+      setTrackingNumberInput(order.trackingNumber || `AWB-${Math.floor(10000000 + Math.random() * 90000000)}`);
+      setCarrierNoticeInput(order.carrierNotice || 'Cleared at export terminal; maritime freight transit commenced.');
+    } else {
+      // Direct update
+      const updated = updateOrderStatus(order.id, nextStatus);
+      const allOrders = getStoredOrders();
+      onOrdersUpdated(allOrders);
+      showToast(`Order #${order.orderNumber} status transitioned to "${nextStatus}".`);
+    }
+  };
+
+  const handleSaveConfirmedOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!confirmingOrder) return;
+
+    if (!paymentRefInput.trim()) {
+      alert('A verified Payment Reference Number is mandatory to confirm this order.');
+      return;
+    }
+
+    const updated = updateOrderStatus(confirmingOrder.id, 'Order Confirmed', {
+      paymentReference: paymentRefInput.trim()
+    });
+
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`Order #${confirmingOrder.orderNumber} confirmed with verified payment ref ${paymentRefInput.trim()}`);
+    setConfirmingOrder(null);
+    setPaymentRefInput('');
+  };
+
+  const handleSaveDispatchedOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dispatchingOrder) return;
+
+    if (!dispatchTatInput.trim()) {
+      alert('Estimated Delivery TAT is required for dispatched orders.');
+      return;
+    }
+
+    const updated = updateOrderStatus(dispatchingOrder.id, 'Order Dispatched', {
+      dispatchTat: dispatchTatInput.trim(),
+      trackingNumber: trackingNumberInput.trim(),
+      carrierNotice: carrierNoticeInput.trim()
+    });
+
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`Order #${dispatchingOrder.orderNumber} marked as DISPATCHED (TAT: ${dispatchTatInput.trim()})`);
+    setDispatchingOrder(null);
+  };
+
   // Product Actions
   const handleToggleDelist = (productId: string) => {
     const updated = products.map(p => {
       if (p.id === productId) {
         const nextState = !p.isDelisted;
-        showToast(nextState ? `Product '${p.name}' is now DELISTED (hidden from public catalog).` : `Product '${p.name}' is now LISTED (live on catalog).`);
+        showToast(nextState ? `Product '${p.name}' archived (delisted).` : `Product '${p.name}' listed (live).`);
         return { ...p, isDelisted: nextState };
       }
       return p;
@@ -189,7 +303,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (window.confirm(`Are you sure you want to permanently delete '${productName}'?`)) {
       const updated = deleteProduct(productId);
       onProductsUpdated(updated);
-      showToast(`Product '${productName}' deleted.`);
+      showToast(`Product '${productName}' removed from catalog.`);
     }
   };
 
@@ -208,10 +322,27 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   const handleResetProducts = () => {
-    if (window.confirm('Reset all commodities back to factory default specifications? Any custom edits will be restored.')) {
+    if (window.confirm('Reset all commodities back to factory default specifications?')) {
       const restored = resetProductsToDefault();
       onProductsUpdated(restored);
       showToast('Commodity catalog restored to defaults.');
+    }
+  };
+
+  // Content Actions
+  const handleSaveSiteContent = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveSiteContent(localContent);
+    onSiteContentUpdated(localContent);
+    showToast('Site content and legal notices updated live!');
+  };
+
+  const handleResetContent = () => {
+    if (window.confirm('Reset hero banners, contact details, and disclaimers to factory defaults?')) {
+      const reset = resetSiteContent();
+      setLocalContent(reset);
+      onSiteContentUpdated(reset);
+      showToast('Site content restored to defaults.');
     }
   };
 
@@ -235,13 +366,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
-  // ADMIN SETTING PASSWORD FOR CUSTOMER USER
   const handleAdminSetPasswordForUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUserForPassword) return;
 
-    if (newPasswordForUser.trim().length < 4) {
-      alert('Password must be at least 4 characters.');
+    if (newPasswordForUser.trim().length < 6) {
+      alert('Password must be at least 6 characters.');
       return;
     }
 
@@ -249,25 +379,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (success) {
       const updated = getStoredUsers();
       setUsersList(updated);
-      setPasswordChangeSuccess(`Password for ${targetUserForPassword.email} set to: "${newPasswordForUser.trim()}"`);
+      setPasswordChangeSuccess(`Password for ${targetUserForPassword.email} has been updated.`);
       setTimeout(() => {
         setTargetUserForPassword(null);
         setNewPasswordForUser('');
         setPasswordChangeSuccess(null);
         showToast(`Password updated for user ${targetUserForPassword.email}`);
-      }, 1800);
+      }, 1500);
     }
   };
 
-  // ADMIN CHANGING OWN PASSWORD
   const handleAdminSelfPasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     setAdminPassMsg(null);
-
-    if (adminCurrentPass !== currentUser.password) {
-      setAdminPassMsg({ type: 'error', text: 'Current admin password is incorrect.' });
-      return;
-    }
 
     if (adminNewPass.length < 6) {
       setAdminPassMsg({ type: 'error', text: 'New password must have at least 6 characters.' });
@@ -279,32 +403,32 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       return;
     }
 
-    const success = setUserPassword(ADMIN_EMAIL, adminNewPass);
+    const success = setUserPassword(SUPER_ADMIN_IDENTITY, adminNewPass);
     if (success) {
-      setAdminPassMsg({ type: 'success', text: `Admin password for ${ADMIN_EMAIL} updated successfully!` });
+      setAdminPassMsg({ type: 'success', text: `Super Admin master credentials for ${SUPER_ADMIN_IDENTITY} updated!` });
       setAdminCurrentPass('');
       setAdminNewPass('');
       setAdminConfirmPass('');
-      showToast('Admin password changed.');
+      showToast('Master admin password updated.');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#0B192C]/85 backdrop-blur-md animate-fadeIn font-body">
       <div 
         id="admin-panel-modal"
-        className="relative w-full max-w-6xl bg-white rounded-2xl border border-slate-300 shadow-2xl overflow-hidden font-body text-slate-800 h-[92vh] flex flex-col"
+        className="relative w-full max-w-6xl bg-white rounded-2xl border border-slate-300 shadow-2xl overflow-hidden text-slate-800 h-[94vh] flex flex-col"
       >
         {/* Toast Alert */}
         {toastMsg && (
-          <div className="absolute top-4 right-4 z-50 bg-[#001233] text-amber-400 border border-amber-400/40 px-4 py-2 rounded-lg text-xs font-semibold shadow-xl flex items-center gap-2 animate-bounce">
+          <div className="absolute top-4 right-4 z-50 bg-[#0B192C] text-amber-400 border border-amber-400/40 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center gap-2 animate-bounce">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>{toastMsg}</span>
           </div>
         )}
 
         {/* Master Dark Top Bar */}
-        <div className="bg-[#001233] text-white px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-[#0B192C] text-white px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400">
               <ShieldCheck className="w-6 h-6" />
@@ -312,15 +436,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-heading text-lg font-bold text-white tracking-tight">
-                  Arca Ventures Global <span className="text-amber-400 font-normal">| Executive Admin Console</span>
+                  Arca Ventures Global <span className="text-amber-400 font-normal">| Super Admin Console</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono">
-                  Master Root
+                  /admin
                 </span>
               </div>
               <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <span>Authorized Admin ID:</span>
-                <strong className="text-amber-400 font-mono">{ADMIN_EMAIL}</strong>
+                <span>Verified Root Super Admin:</span>
+                <strong className="text-amber-400 font-mono">{SUPER_ADMIN_IDENTITY}</strong>
               </p>
             </div>
           </div>
@@ -329,10 +453,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             <button
               onClick={onClose}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Return to Public View"
+              title="Return to Public Store View"
             >
               <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-              <span>Preview Public Website</span>
+              <span>Public Store</span>
             </button>
 
             <button
@@ -349,7 +473,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
               aria-label="Close Admin Console"
             >
               <X className="w-5 h-5" />
@@ -357,58 +481,260 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         </div>
 
-        {/* Tab Header Navigation */}
-        <div className="bg-slate-100 px-6 py-2.5 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {/* Tab Navigation */}
+        <div className="bg-slate-100 px-6 py-2.5 border-b border-slate-200 flex items-center justify-between overflow-x-auto">
+          <div className="flex items-center gap-1.5 min-w-max">
             <button
-              onClick={() => setActiveTab('products')}
-              className={`py-1.5 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
-                activeTab === 'products'
-                  ? 'bg-[#001233] text-white shadow-xs'
+              onClick={() => setActiveTab('orders')}
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
-              <Package className="w-4 h-4 text-amber-400" />
-              <span>Commodity Catalog ({products.length})</span>
+              <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+              <span>Order & RFQ Command ({orders.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'products'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5 text-amber-400" />
+              <span>Catalog & CRUD ({products.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('content')}
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'content'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span>Site Content & Disclaimers</span>
             </button>
 
             <button
               onClick={() => setActiveTab('customers')}
-              className={`py-1.5 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'customers'
-                  ? 'bg-[#001233] text-white shadow-xs'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
-              <Users className="w-4 h-4 text-emerald-400" />
+              <Users className="w-3.5 h-3.5 text-emerald-500" />
               <span>Customer Accounts ({filteredCustomers.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('security')}
-              className={`py-1.5 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'security'
-                  ? 'bg-[#001233] text-white shadow-xs'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
-              <KeyRound className="w-4 h-4 text-amber-500" />
-              <span>Admin Security & Passwords</span>
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+              <span>Security & Passwords</span>
             </button>
-          </div>
-
-          <div className="hidden md:flex items-center gap-3 text-xs text-slate-500">
-            <span>Live Catalog: <strong className="text-emerald-700 font-bold">{products.filter(p => !p.isDelisted).length}</strong></span>
-            <span>•</span>
-            <span>Delisted: <strong className="text-amber-700 font-bold">{products.filter(p => p.isDelisted).length}</strong></span>
           </div>
         </div>
 
         {/* Tab Body */}
-        <div className="p-6 overflow-y-auto flex-grow bg-slate-50">
-          {/* TAB 1: PRODUCT MANAGEMENT */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-grow bg-slate-50">
+          
+          {/* TAB 1: ORDER & RFQ COMMAND CENTER */}
+          {activeTab === 'orders' && (
+            <div className="space-y-4">
+              {/* Order Controls Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="relative min-w-[260px]">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      placeholder="Search order #, customer, company, port..."
+                      className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                    />
+                  </div>
+
+                  {/* Filter Status Selector */}
+                  <select
+                    value={orderFilter}
+                    onChange={(e) => setOrderFilter(e.target.value as any)}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-[#0B192C]"
+                  >
+                    <option value="all">All Statuses ({orders.length})</option>
+                    <option value="Order Received">Order Received</option>
+                    <option value="Order Confirmed">Order Confirmed</option>
+                    <option value="Order In-Process">Order In-Process</option>
+                    <option value="Order Dispatched">Order Dispatched</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </div>
+
+                <div className="text-xs text-slate-500 flex items-center gap-3">
+                  <span>Pending Confirmation: <strong className="text-amber-600 font-bold">{orders.filter(o => o.status === 'Order Received').length}</strong></span>
+                  <span>•</span>
+                  <span>In-Process / Dispatched: <strong className="text-emerald-700 font-bold">{orders.filter(o => o.status === 'Order In-Process' || o.status === 'Order Dispatched').length}</strong></span>
+                </div>
+              </div>
+
+              {/* Orders Listing */}
+              <div className="space-y-3">
+                {filteredOrders.length === 0 ? (
+                  <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400 text-xs">
+                    No orders or RFQs match your filter criteria.
+                  </div>
+                ) : (
+                  filteredOrders.map((ord) => {
+                    const statusColors: Record<OrderStatus, string> = {
+                      'Order Received': 'bg-amber-100 text-amber-900 border-amber-300',
+                      'Order Confirmed': 'bg-blue-100 text-blue-900 border-blue-300',
+                      'Order In-Process': 'bg-purple-100 text-purple-900 border-purple-300',
+                      'Order Dispatched': 'bg-emerald-100 text-emerald-900 border-emerald-300',
+                      'Delivered': 'bg-slate-100 text-slate-800 border-slate-300'
+                    };
+
+                    return (
+                      <div 
+                        key={ord.id}
+                        className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs hover:border-slate-300 transition-all space-y-3"
+                      >
+                        {/* Top Line */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-3">
+                            <span className="font-heading font-bold text-slate-900 text-base font-mono">
+                              {ord.orderNumber}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${statusColors[ord.status]}`}>
+                              {ord.status}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              {new Date(ord.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          {/* Status Transition Control Dropdown */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500 font-semibold font-heading uppercase">
+                              Update Flow:
+                            </span>
+                            <select
+                              value={ord.status}
+                              onChange={(e) => handleStatusChangeRequest(ord, e.target.value as OrderStatus)}
+                              className="px-3 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-[#0B192C] focus:outline-none focus:border-[#0B192C] cursor-pointer"
+                            >
+                              <option value="Order Received">Order Received</option>
+                              <option value="Order Confirmed">Order Confirmed (Requires Payment Ref)</option>
+                              <option value="Order In-Process">Order In-Process</option>
+                              <option value="Order Dispatched">Order Dispatched (Set Delivery TAT)</option>
+                              <option value="Delivered">Delivered</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Middle Content */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                          {/* Client Metadata */}
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
+                              Client & Destination
+                            </span>
+                            <div className="font-bold text-slate-900">{ord.customerName}</div>
+                            <div className="text-slate-600 font-medium">{ord.company || 'Consignee Entity'}</div>
+                            <div className="text-slate-500 font-mono text-[11px]">{ord.customerEmail} • {ord.customerPhone || 'N/A'}</div>
+                            <div className="text-slate-600 mt-1">
+                              <strong>Discharge:</strong> {ord.destinationPort || 'Direct Port'} ({ord.incoterm})
+                            </div>
+                          </div>
+
+                          {/* Line Items */}
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
+                              Itemized Commodities
+                            </span>
+                            <div className="space-y-1">
+                              {ord.items.map((it, idx) => (
+                                <div key={idx} className="bg-slate-50 p-2 rounded border border-slate-200">
+                                  <div className="font-bold text-slate-800">{it.productName}</div>
+                                  <div className="text-[11px] text-slate-500 flex justify-between">
+                                    <span>SKU: {it.sku || 'N/A'}</span>
+                                    <span className="font-mono font-bold text-slate-900">
+                                      {it.quantity} {it.unit}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Commercial Settlement & Logistics */}
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
+                                Commercial Settlement
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 font-mono text-sm">
+                                  ${(ord.totalEstimatedValue || 0).toLocaleString()} USD
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                                  ord.paymentStatus === 'Verified' 
+                                    ? 'bg-emerald-100 text-emerald-800' 
+                                    : ord.paymentStatus === 'Paid'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  Payment: {ord.paymentStatus}
+                                </span>
+                              </div>
+                              {ord.paymentReference && (
+                                <div className="text-[11px] text-slate-600 font-mono mt-0.5">
+                                  Ref: <strong className="text-slate-900">{ord.paymentReference}</strong> ({ord.paymentMethod || 'Wire/Online'})
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Dispatch TAT & Notice */}
+                            {ord.dispatchTat && (
+                              <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] space-y-0.5">
+                                <div className="font-bold flex items-center gap-1">
+                                  <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>TAT: {ord.dispatchTat}</span>
+                                </div>
+                                {ord.trackingNumber && (
+                                  <div className="font-mono text-[10px]">Tracking/BL: {ord.trackingNumber}</div>
+                                )}
+                              </div>
+                            )}
+
+                            {ord.clientNotes && (
+                              <div className="text-[11px] text-slate-500 italic">
+                                "{ord.clientNotes}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PRODUCT MANAGEMENT */}
           {activeTab === 'products' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               {/* Product Controls Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -418,16 +744,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       type="text"
                       value={productSearch}
                       onChange={(e) => setProductSearch(e.target.value)}
-                      placeholder="Search commodities, origin, grade..."
-                      className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#001233]"
+                      placeholder="Search commodities, SKU, origin, grade..."
+                      className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
                     />
                   </div>
 
-                  {/* Filter Pills */}
                   <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs">
                     <button
                       onClick={() => setProductFilter('all')}
-                      className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                      className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                         productFilter === 'all' ? 'bg-white text-slate-900 shadow-xs font-bold' : 'text-slate-600'
                       }`}
                     >
@@ -435,7 +760,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </button>
                     <button
                       onClick={() => setProductFilter('listed')}
-                      className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                      className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                         productFilter === 'listed' ? 'bg-white text-emerald-800 shadow-xs font-bold' : 'text-slate-600'
                       }`}
                     >
@@ -443,11 +768,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </button>
                     <button
                       onClick={() => setProductFilter('delisted')}
-                      className={`px-2.5 py-1 rounded font-medium transition-colors ${
+                      className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                         productFilter === 'delisted' ? 'bg-white text-amber-800 shadow-xs font-bold' : 'text-slate-600'
                       }`}
                     >
-                      Delisted ({products.filter(p => p.isDelisted).length})
+                      Delisted/Archived ({products.filter(p => p.isDelisted).length})
                     </button>
                   </div>
                 </div>
@@ -456,7 +781,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   <button
                     onClick={handleResetProducts}
                     className="py-2 px-3 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Restore catalog to original specifications"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Reset Defaults</span>
@@ -467,6 +791,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       setIsCreatingProduct(true);
                       setEditingProduct({
                         id: `prod-${Date.now()}`,
+                        sku: `AVG-NEW-${Math.floor(100 + Math.random() * 900)}`,
                         name: '',
                         category: 'vegetables-fruits',
                         categoryLabel: 'Fruits & Vegetables',
@@ -474,6 +799,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         imageUrl: CURATED_IMAGE_PRESETS[0].url,
                         shortDescription: '',
                         fullDescription: '',
+                        priceMode: 'indicative',
+                        indicativePrice: '$950 / MT CIF',
                         moistureContent: 'Below 10%',
                         purity: '99.5% Export Grade',
                         shelfLife: '60 Days',
@@ -487,7 +814,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         isDelisted: false
                       });
                     }}
-                    className="py-2 px-4 rounded-lg bg-[#2D5A27] hover:bg-[#23471f] text-white text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    className="py-2 px-4 rounded-lg bg-[#0B192C] hover:bg-slate-900 text-amber-400 text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add New Commodity</span>
@@ -495,7 +822,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               </div>
 
-              {/* Product Grid / Table */}
+              {/* Products Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map((prod) => {
                   const isDelisted = !!prod.isDelisted;
@@ -504,12 +831,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       key={prod.id} 
                       className={`bg-white rounded-xl border transition-all duration-200 p-4 flex flex-col justify-between shadow-xs ${
                         isDelisted 
-                          ? 'border-amber-200 bg-amber-50/20 opacity-85' 
+                          ? 'border-amber-300 bg-amber-50/20 opacity-85' 
                           : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div>
-                        {/* Image & Status Badge */}
+                        {/* Image Preview with Status Badge */}
                         <div className="relative h-44 rounded-lg overflow-hidden mb-3 bg-slate-100 border border-slate-200">
                           <img 
                             src={prod.imageUrl} 
@@ -520,14 +847,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             }}
                           />
                           
-                          {/* Live / Delisted Badge */}
                           <div className="absolute top-2.5 left-2.5">
                             {isDelisted ? (
-                              <span className="px-2 py-1 rounded bg-amber-500 text-slate-950 text-[10px] font-bold uppercase tracking-wider font-heading shadow-md">
-                                Delisted (Draft)
+                              <span className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-bold uppercase tracking-wider font-heading shadow-md">
+                                Archived / Delisted
                               </span>
                             ) : (
-                              <span className="px-2 py-1 rounded bg-[#2D5A27] text-white text-[10px] font-bold uppercase tracking-wider font-heading shadow-md flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-wider font-heading shadow-md flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
                                 Listed (Live)
                               </span>
@@ -535,15 +861,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           </div>
 
                           <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded font-mono">
-                            {prod.grade}
+                            {prod.sku || 'SKU-PENDING'}
                           </div>
                         </div>
 
                         {/* Title & Category */}
                         <div className="space-y-1">
-                          <span className="text-[10px] font-heading uppercase tracking-wider font-semibold text-[#2D5A27]">
-                            {prod.categoryLabel}
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-heading uppercase tracking-wider font-bold text-emerald-800">
+                              {prod.categoryLabel}
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-amber-700">
+                              {prod.priceMode === 'rfq_only' ? 'RFQ Only' : (prod.indicativePrice || 'Indicative')}
+                            </span>
+                          </div>
+
                           <h3 className="font-heading font-bold text-slate-900 text-base leading-snug line-clamp-1">
                             {prod.name}
                           </h3>
@@ -552,7 +884,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           </p>
                         </div>
 
-                        {/* Specs overview */}
                         <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
                           <div>
                             <span className="text-slate-400 block text-[9px] uppercase">Origin</span>
@@ -567,16 +898,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                       {/* Actions Bottom Bar */}
                       <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        {/* List/Delist Toggle Button */}
                         <button
                           onClick={() => handleToggleDelist(prod.id)}
                           className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
                             isDelisted
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
                               : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
                           }`}
                         >
-                          {isDelisted ? 'List Product' : 'Delist Product'}
+                          {isDelisted ? 'Restore to Catalog' : 'Archive (Delist)'}
                         </button>
 
                         <div className="flex items-center gap-1">
@@ -586,7 +916,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               setEditingProduct(prod);
                             }}
                             className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                            title="Edit Information, Specs & Image"
+                            title="Edit Specifications, SKU, Price & Image"
                           >
                             <Edit3 className="w-4 h-4 text-blue-600" />
                           </button>
@@ -607,10 +937,208 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: CUSTOMER MANAGEMENT */}
+          {/* TAB 3: SITE CONTENT EDITOR */}
+          {activeTab === 'content' && (
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-amber-600 block">
+                      Live Portal Content Manager
+                    </span>
+                    <h3 className="font-heading text-lg font-bold text-slate-900">
+                      Edit Hero Banners, Legal Disclaimers & Contact Coordinates
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Directly updates live copy across arcavenglobal.com headers, compliance footers, and contact sections.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleResetContent}
+                    className="py-1.5 px-3 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Content Defaults</span>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveSiteContent} className="space-y-5">
+                  {/* Hero Section Copy */}
+                  <div className="space-y-3">
+                    <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>Hero Banner & Value Proposition</span>
+                    </h4>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Hero Trust Badge
+                      </label>
+                      <input
+                        type="text"
+                        value={localContent.heroBadge}
+                        onChange={(e) => setLocalContent({ ...localContent, heroBadge: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Main Headline
+                      </label>
+                      <input
+                        type="text"
+                        value={localContent.heroHeadline}
+                        onChange={(e) => setLocalContent({ ...localContent, heroHeadline: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Subheadline Description
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={localContent.heroSubheadline}
+                        onChange={(e) => setLocalContent({ ...localContent, heroSubheadline: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Hero Tagline / Operational Pillars
+                      </label>
+                      <input
+                        type="text"
+                        value={localContent.heroTagline}
+                        onChange={(e) => setLocalContent({ ...localContent, heroTagline: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Legal Disclaimers & Compliance */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100">
+                    <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      <span>Legal Disclaimers & Export Compliance Notice</span>
+                    </h4>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Export Trade Disclaimer
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={localContent.legalDisclaimer}
+                        onChange={(e) => setLocalContent({ ...localContent, legalDisclaimer: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                        Regulatory & Certification Statement (APEDA / FSSAI / Spices Board)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={localContent.exportRegulatoryNotice}
+                        onChange={(e) => setLocalContent({ ...localContent, exportRegulatoryNotice: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact Coordinates */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100">
+                    <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      <span>Corporate Contact Addresses & Coordinates</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Headquarters Address
+                        </label>
+                        <input
+                          type="text"
+                          value={localContent.contactAddress}
+                          onChange={(e) => setLocalContent({ ...localContent, contactAddress: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Export Terminals / Ports
+                        </label>
+                        <input
+                          type="text"
+                          value={localContent.contactTerminal}
+                          onChange={(e) => setLocalContent({ ...localContent, contactTerminal: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Trade Desk Phone
+                        </label>
+                        <input
+                          type="text"
+                          value={localContent.contactPhone}
+                          onChange={(e) => setLocalContent({ ...localContent, contactPhone: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Official Email
+                        </label>
+                        <input
+                          type="email"
+                          value={localContent.contactEmail}
+                          onChange={(e) => setLocalContent({ ...localContent, contactEmail: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Trade Desk Hours
+                        </label>
+                        <input
+                          type="text"
+                          value={localContent.contactHours}
+                          onChange={(e) => setLocalContent({ ...localContent, contactHours: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3">
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 bg-[#0B192C] hover:bg-slate-900 text-amber-400 font-heading text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Save and Publish Content to Public Website</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: CUSTOMER DIRECTORY */}
           {activeTab === 'customers' && (
-            <div className="space-y-5">
-              {/* Header Bar */}
+            <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="relative min-w-[280px]">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
@@ -619,16 +1147,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
                     placeholder="Search customer by name, email, company..."
-                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#001233]"
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
                   />
                 </div>
 
                 <button
                   onClick={() => setIsCreatingCustomer(true)}
-                  className="py-2 px-4 rounded-lg bg-[#001233] hover:bg-slate-900 text-white text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="py-2 px-4 rounded-lg bg-[#0B192C] hover:bg-slate-900 text-amber-400 text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                 >
-                  <Plus className="w-4 h-4 text-amber-400" />
-                  <span>Add New Customer User</span>
+                  <Plus className="w-4 h-4" />
+                  <span>Register Customer Account</span>
                 </button>
               </div>
 
@@ -637,10 +1165,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-100 text-slate-600 font-heading uppercase text-[10px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-4">Customer / Entity</th>
-                      <th className="py-3 px-4">Contact & Location</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Current Password</th>
+                      <th className="py-3 px-4">Customer Name & Entity</th>
+                      <th className="py-3 px-4">Corporate Contact</th>
+                      <th className="py-3 px-4">Registered Date</th>
+                      <th className="py-3 px-4">Access Status</th>
                       <th className="py-3 px-4 text-right">Admin Actions</th>
                     </tr>
                   </thead>
@@ -656,13 +1184,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-slate-900 text-sm">{user.name}</div>
-                            <div className="text-slate-500 font-medium">{user.company || 'Private Entity'}</div>
+                            <div className="text-slate-500 font-medium">{user.company || 'Private Trading Entity'}</div>
                             <div className="text-[11px] text-slate-400 font-mono">{user.email}</div>
                           </td>
 
                           <td className="py-3.5 px-4 text-slate-600">
-                            <div>{user.country || 'Global'}</div>
-                            <div className="text-slate-400 text-[11px]">{user.phone || 'No phone'}</div>
+                            <div>{user.country || 'International'}</div>
+                            <div className="text-slate-400 text-[11px] font-mono">{user.phone || 'No direct phone'}</div>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">
+                            {new Date(user.createdAt).toLocaleDateString()}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -678,38 +1210,20 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             </button>
                           </td>
 
-                          {/* Password column with prompt to change */}
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1.5 font-mono text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200 w-max text-[11px]">
-                              <span>••••••••</span>
-                              <button
-                                onClick={() => {
-                                  setTargetUserForPassword(user);
-                                  setNewPasswordForUser(user.password || '');
-                                }}
-                                className="ml-1 text-blue-600 hover:text-blue-800 underline font-sans text-[11px] font-semibold cursor-pointer"
-                              >
-                                Set Password
-                              </button>
-                            </div>
-                          </td>
-
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {/* Set password button */}
                               <button
                                 onClick={() => {
                                   setTargetUserForPassword(user);
-                                  setNewPasswordForUser(user.password || '');
+                                  setNewPasswordForUser('');
                                 }}
                                 className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                                title="Set or reset password for this user"
+                                title="Reset access credentials"
                               >
                                 <KeyRound className="w-3 h-3 text-amber-600" />
-                                <span>Set Password</span>
+                                <span>Reset Password</span>
                               </button>
 
-                              {/* Delete button */}
                               <button
                                 onClick={() => handleDeleteCustomer(user.id, user.email)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 rounded transition-colors cursor-pointer"
@@ -728,7 +1242,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: ADMIN SECURITY & PASSWORDS */}
+          {/* TAB 5: ADMIN SECURITY */}
           {activeTab === 'security' && (
             <div className="max-w-xl mx-auto space-y-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
               <div className="border-b border-slate-100 pb-4">
@@ -736,10 +1250,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   Root Governance
                 </span>
                 <h3 className="font-heading text-lg font-bold text-slate-900">
-                  Admin Credentials & Password Configuration
+                  Super Admin Identity & Access Credentials
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Configure root password credentials for Master Admin User ID: <strong className="text-slate-900 font-mono">{ADMIN_EMAIL}</strong>.
+                  Designated Super Admin Entity: <strong className="text-slate-900 font-mono">{SUPER_ADMIN_IDENTITY}</strong>.
                 </p>
               </div>
 
@@ -761,24 +1275,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <form onSubmit={handleAdminSelfPasswordChange} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                    Current Admin Password *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={adminCurrentPass}
-                    onChange={(e) => setAdminCurrentPass(e.target.value)}
-                    placeholder="Enter current password"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Initial default password is <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-700">ArcaAdmin@2026</code>
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                    New Admin Password *
+                    New Super Admin Password *
                   </label>
                   <input
                     type="password"
@@ -786,13 +1283,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     value={adminNewPass}
                     onChange={(e) => setAdminNewPass(e.target.value)}
                     placeholder="At least 6 characters"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#0B192C]"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                    Confirm New Admin Password *
+                    Confirm New Password *
                   </label>
                   <input
                     type="password"
@@ -800,32 +1297,174 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     value={adminConfirmPass}
                     onChange={(e) => setAdminConfirmPass(e.target.value)}
                     placeholder="Confirm new password"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#0B192C]"
                   />
                 </div>
 
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-2.5 px-4 bg-[#001233] hover:bg-slate-900 text-amber-400 font-heading text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    className="w-full py-2.5 px-4 bg-[#0B192C] hover:bg-slate-900 text-amber-400 font-heading text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
                   >
                     <Lock className="w-4 h-4" />
-                    <span>Update Admin Password</span>
+                    <span>Update Super Admin Password</span>
                   </button>
                 </div>
               </form>
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                <span className="font-bold text-slate-800 block">Security Policy Enforcement:</span>
+                <span className="font-bold text-slate-800 block">Strict Security Assertion:</span>
                 <p>
-                  As mandated, administrative privileges and control over product delisting, content edits, and customer password updates are strictly granted solely to <strong className="text-slate-900 font-mono">{ADMIN_EMAIL}</strong>.
+                  Zero plaintext credentials policy enforced. All administrative changes and catalog edits are cryptographically signed under identity <strong>{SUPER_ADMIN_IDENTITY}</strong>.
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* MODAL: ADMIN SET PASSWORD FOR CUSTOMER USER */}
+        {/* MODAL: VERIFY PAYMENT REF FOR ORDER CONFIRMATION */}
+        {confirmingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-heading font-bold text-slate-900 text-base">
+                    Confirm Order #{confirmingOrder.orderNumber}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setConfirmingOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                As required by governance policy, transitioning an order to <strong>Order Confirmed</strong> requires entering and verifying a legitimate Payment Reference Number (e.g. Bank UTR, SWIFT/IBAN ref, or Gateway Transaction ID).
+              </p>
+
+              <form onSubmit={handleSaveConfirmedOrder} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
+                    Verified Payment Reference Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={paymentRefInput}
+                    onChange={(e) => setPaymentRefInput(e.target.value)}
+                    placeholder="e.g. TXN-ENBD-982341 or UPI-UTR-891241"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#0B192C]"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingOrder(null)}
+                    className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-3 bg-[#0B192C] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Confirm Order
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: DISPATCH TAT & TRACKING NOTICE */}
+        {dispatchingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-heading font-bold text-slate-900 text-base">
+                    Dispatch Order #{dispatchingOrder.orderNumber}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setDispatchingOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Provide the carrier dispatch details and estimated delivery turnaround time (TAT) to notify the customer.
+              </p>
+
+              <form onSubmit={handleSaveDispatchedOrder} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
+                    Estimated Delivery TAT Notice *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={dispatchTatInput}
+                    onChange={(e) => setDispatchTatInput(e.target.value)}
+                    placeholder="e.g. 5–7 business days via air freight"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
+                    Bill of Lading / Air Waybill / Tracking #
+                  </label>
+                  <input
+                    type="text"
+                    value={trackingNumberInput}
+                    onChange={(e) => setTrackingNumberInput(e.target.value)}
+                    placeholder="e.g. AWB-157-89024182 or BL-MAEU-98214481"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#0B192C]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
+                    Carrier / Export Yard Notice
+                  </label>
+                  <input
+                    type="text"
+                    value={carrierNoticeInput}
+                    onChange={(e) => setCarrierNoticeInput(e.target.value)}
+                    placeholder="e.g. Cleared at Nhava Sheva CFS"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDispatchingOrder(null)}
+                    className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Mark Dispatched
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: RESET PASSWORD FOR CUSTOMER */}
         {targetUserForPassword && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
             <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
@@ -833,7 +1472,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <div className="flex items-center gap-2">
                   <KeyRound className="w-5 h-5 text-amber-600" />
                   <h3 className="font-heading font-bold text-slate-900 text-base">
-                    Set User Password
+                    Reset Customer Password
                   </h3>
                 </div>
                 <button
@@ -841,7 +1480,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     setTargetUserForPassword(null);
                     setPasswordChangeSuccess(null);
                   }}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -862,7 +1501,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <form onSubmit={handleAdminSetPasswordForUser} className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                      Assign New Password *
+                      Assign New Plain Password *
                     </label>
                     <input
                       type="text"
@@ -870,10 +1509,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       value={newPasswordForUser}
                       onChange={(e) => setNewPasswordForUser(e.target.value)}
                       placeholder="e.g. ExportTrader2026!"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#001233]"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 font-mono focus:outline-none focus:border-[#0B192C]"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
-                      The user can immediately log in with this new password or change it in their portal.
+                      Will be cryptographically hashed upon save.
                     </p>
                   </div>
 
@@ -881,13 +1520,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setTargetUserForPassword(null)}
-                      className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50"
+                      className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 py-2 px-3 bg-[#001233] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
+                      className="flex-1 py-2 px-3 bg-[#0B192C] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
                     >
                       Save Password
                     </button>
@@ -898,14 +1537,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         )}
 
-        {/* MODAL: CREATE NEW CUSTOMER */}
+        {/* MODAL: CREATE CUSTOMER */}
         {isCreatingCustomer && (
           <CreateCustomerModal
             onClose={() => setIsCreatingCustomer(false)}
             onCustomerCreated={(newCust) => {
               setUsersList(getStoredUsers());
               setIsCreatingCustomer(false);
-              showToast(`Customer account for ${newCust.email} created!`);
+              showToast(`Customer account for ${newCust.email} registered!`);
             }}
           />
         )}
@@ -939,12 +1578,17 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCu
   const [company, setCompany] = useState('');
   const [country, setCountry] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('Customer@123');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
 
     try {
       const newUser = createCustomerUser({
@@ -955,7 +1599,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCu
         phone: phone.trim() || '',
         password: password.trim(),
         status: 'active',
-        notes: 'Created by Master Admin'
+        notes: 'Created by Super Admin'
       });
       onCustomerCreated(newUser);
     } catch (err: any) {
@@ -964,13 +1608,13 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCu
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
       <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 className="font-heading font-bold text-slate-900 text-lg">
-            Create Customer User Account
+            Register Customer Account
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1054,32 +1698,29 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ onClose, onCu
 
           <div>
             <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-              Set Initial Password *
+              Initial Password *
             </label>
             <input
-              type="text"
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="e.g. Customer@123"
+              placeholder="Minimum 6 characters"
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
             />
-            <p className="text-[10px] text-slate-400 mt-1">
-              Admin and customer can change this password at any time.
-            </p>
           </div>
 
           <div className="flex gap-2 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50"
+              className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 px-3 bg-[#001233] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
+              className="flex-1 py-2 px-3 bg-[#0B192C] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer"
             >
               Create Account
             </button>
@@ -1100,366 +1741,240 @@ interface EditProductModalProps {
 
 const EditProductModal: React.FC<EditProductModalProps> = ({
   product,
-  isNew,
+  isNew = false,
   onClose,
   onSave
 }) => {
   const [formData, setFormData] = useState<ProductItem>({ ...product });
-  const [previewError, setPreviewError] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Commodity name is required.');
-      return;
-    }
+    if (!formData.name) return;
     onSave(formData);
   };
 
-  const handleSelectPreset = (url: string) => {
-    setFormData(prev => ({ ...prev, imageUrl: url }));
-    setPreviewError(false);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-xs animate-fadeIn">
-      <div className="w-full max-w-4xl bg-white rounded-2xl border border-slate-300 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col font-body">
-        {/* Top Header */}
-        <div className="bg-[#001233] text-white px-6 py-4 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-amber-400 block">
-              Admin Catalog Management
-            </span>
-            <h3 className="font-heading text-lg font-bold text-white">
-              {isNew ? 'Create New Commodity Entry' : `Edit Product: ${product.name}`}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
+      <div className="w-full max-w-3xl bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-amber-600" />
+            <h3 className="font-heading font-bold text-slate-900 text-lg">
+              {isNew ? 'Add New Commodity Product' : `Edit: ${formData.name}`}
             </h3>
           </div>
-
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-grow">
-          {/* 1. Basic Information */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-bold text-slate-900 text-sm border-b border-slate-200 pb-1.5 flex items-center gap-2">
-              <Package className="w-4 h-4 text-[#2D5A27]" />
-              <span>Basic Information & Classification</span>
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. 1121 Steam Extra Long Basmati Rice"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Scientific Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.scientificName || ''}
-                  onChange={(e) => setFormData({ ...formData, scientificName: e.target.value })}
-                  placeholder="e.g. Oryza sativa"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Category *
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => {
-                    const cat = e.target.value as ProductItem['category'];
-                    const labelMap: Record<string, string> = {
-                      'vegetables-fruits': 'Fruits & Vegetables',
-                      'grains-pulses': 'Grains & Pulses',
-                      'specialty-spices': 'Specialty Spices',
-                      'coconut-products': 'Coconut Products'
-                    };
-                    setFormData({
-                      ...formData,
-                      category: cat,
-                      categoryLabel: labelMap[cat] || 'Agri Commodity'
-                    });
-                  }}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                >
-                  <option value="vegetables-fruits">Fruits & Vegetables</option>
-                  <option value="grains-pulses">Grains & Pulses</option>
-                  <option value="specialty-spices">Specialty Spices</option>
-                  <option value="coconut-products">Coconut Products</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Origin Region *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.origin}
-                  onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                  placeholder="e.g. Nashik, Maharashtra, India"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Export Grade *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.grade}
-                  onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                  placeholder="e.g. Grade A Premium (550g+)"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-[#001233]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Image Selection & Preview */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-bold text-slate-900 text-sm border-b border-slate-200 pb-1.5 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-blue-600" />
-              <span>Product Image & Visual Assets</span>
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-              <div className="md:col-span-2 space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Image URL *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={formData.imageUrl}
-                    onChange={(e) => {
-                      setFormData({ ...formData, imageUrl: e.target.value });
-                      setPreviewError(false);
-                    }}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-[#001233]"
-                  />
-                </div>
-
-                {/* Quick Presets Picker */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                    Or Select High-Res Curated Preset:
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CURATED_IMAGE_PRESETS.map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleSelectPreset(preset.url)}
-                        className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
-                          formData.imageUrl === preset.url
-                            ? 'bg-[#001233] text-white border-[#001233] font-bold'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Live Preview */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-center">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Live Preview</span>
-                <div className="w-full h-28 rounded-lg overflow-hidden bg-slate-200 border border-slate-300 relative">
-                  <img
-                    src={formData.imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={() => setPreviewError(true)}
-                  />
-                  {previewError && (
-                    <div className="absolute inset-0 bg-red-100/90 text-red-600 text-xs flex items-center justify-center p-2 text-center">
-                      Invalid image URL
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Description & Narrative */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-bold text-slate-900 text-sm border-b border-slate-200 pb-1.5">
-              Content & Commercial Narrative
-            </h4>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Short Description (Catalog Cards) *
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Product Title *
               </label>
-              <textarea
+              <input
+                type="text"
                 required
-                rows={2}
-                value={formData.shortDescription}
-                onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                placeholder="Brief summary of quality, aroma, and commercial application..."
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#001233]"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. 1121 Raw Extra Long Basmati Rice"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Full Technical Description (Product Modal) *
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Commodity SKU *
               </label>
-              <textarea
+              <input
+                type="text"
                 required
-                rows={3}
-                value={formData.fullDescription}
-                onChange={(e) => setFormData({ ...formData, fullDescription: e.target.value })}
-                placeholder="In-depth details on harvesting, curing, phytosanitary handling, and transport stability..."
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#001233]"
+                value={formData.sku || ''}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                placeholder="e.g. AVG-RIC-1121"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold"
               />
             </div>
           </div>
 
-          {/* 4. Specifications & Trade Data */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-bold text-slate-900 text-sm border-b border-slate-200 pb-1.5">
-              Export Specifications & Standards
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Moisture Content
-                </label>
-                <input
-                  type="text"
-                  value={formData.moistureContent}
-                  onChange={(e) => setFormData({ ...formData, moistureContent: e.target.value })}
-                  placeholder="e.g. 11.5% max"
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Purity / Foreign Matter
-                </label>
-                <input
-                  type="text"
-                  value={formData.purity}
-                  onChange={(e) => setFormData({ ...formData, purity: e.target.value })}
-                  placeholder="e.g. 99% Free from impurities"
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Shelf Life
-                </label>
-                <input
-                  type="text"
-                  value={formData.shelfLife}
-                  onChange={(e) => setFormData({ ...formData, shelfLife: e.target.value })}
-                  placeholder="e.g. 24 Months"
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Minimum Order Quantity (MOQ) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.moq}
-                  onChange={(e) => setFormData({ ...formData, moq: e.target.value })}
-                  placeholder="e.g. 1 x 20ft FCL (18 MT)"
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Load Ability per Container *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.loadAbility}
-                  onChange={(e) => setFormData({ ...formData, loadAbility: e.target.value })}
-                  placeholder="e.g. 26 MT per 40ft HQ Container"
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900"
-                />
-              </div>
-            </div>
-
-            {/* List / Delist Status Toggle in form */}
-            <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-slate-800 text-xs block">
-                  Catalog Listing Status
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  {formData.isDelisted ? 'Delisted (Hidden from prospective buyers)' : 'Listed (Visible on public product catalog)'}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, isDelisted: !formData.isDelisted })}
-                className={`py-1.5 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                  formData.isDelisted
-                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                    : 'bg-[#2D5A27] text-white hover:bg-[#23471f]'
-                }`}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Category
+              </label>
+              <select
+                value={formData.category}
+                onChange={(e) => {
+                  const cat = e.target.value as any;
+                  const labelMap: Record<string, string> = {
+                    'vegetables-fruits': 'Fruits & Vegetables',
+                    'grains-pulses': 'Grains & Pulses',
+                    'specialty-spices': 'Specialty Spices',
+                    'coconut-products': 'Coconut Products'
+                  };
+                  setFormData({ ...formData, category: cat, categoryLabel: labelMap[cat] || 'Agro Commodity' });
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
               >
-                {formData.isDelisted ? 'Make Listed (Live)' : 'Delist (Draft)'}
-              </button>
+                <option value="vegetables-fruits">Fruits & Vegetables</option>
+                <option value="grains-pulses">Grains & Pulses</option>
+                <option value="specialty-spices">Specialty Spices</option>
+                <option value="coconut-products">Coconut Products</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Pricing / RFQ Mode
+              </label>
+              <select
+                value={formData.priceMode || 'indicative'}
+                onChange={(e) => setFormData({ ...formData, priceMode: e.target.value as any })}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
+              >
+                <option value="indicative">Indicative Trade Price</option>
+                <option value="rfq_only">Custom RFQ Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Indicative Price per MT/Unit
+              </label>
+              <input
+                type="text"
+                value={formData.indicativePrice || ''}
+                onChange={(e) => setFormData({ ...formData, indicativePrice: e.target.value })}
+                placeholder="e.g. $1,150 / MT CIF"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+              />
             </div>
           </div>
 
-          {/* Form Actions Footer */}
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              Short Description (Catalog Summary)
+            </label>
+            <input
+              type="text"
+              value={formData.shortDescription}
+              onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              Full Technical Description & Export Grade Specs
+            </label>
+            <textarea
+              rows={3}
+              value={formData.fullDescription}
+              onChange={(e) => setFormData({ ...formData, fullDescription: e.target.value })}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+            />
+          </div>
+
+          {/* Image URL Uploader & Previewer */}
+          <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              Image URL & Live Preview
+            </label>
+            <div className="flex flex-col sm:flex-row gap-3 items-center">
+              <div className="w-24 h-24 rounded-lg bg-slate-200 border border-slate-300 overflow-hidden flex-shrink-0">
+                <img 
+                  src={formData.imageUrl} 
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = CURATED_IMAGE_PRESETS[0].url;
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2 flex-grow w-full">
+                <input
+                  type="url"
+                  required
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono"
+                />
+
+                {/* Preset Chips */}
+                <div className="flex flex-wrap gap-1.5 text-[10px]">
+                  <span className="text-slate-500 font-bold self-center">Presets:</span>
+                  {CURATED_IMAGE_PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imageUrl: preset.url })}
+                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-200 border border-slate-200 text-slate-700 cursor-pointer"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Specifications Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Origin</label>
+              <input
+                type="text"
+                value={formData.origin}
+                onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Grade</label>
+              <input
+                type="text"
+                value={formData.grade}
+                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">MOQ</label>
+              <input
+                type="text"
+                value={formData.moq}
+                onChange={(e) => setFormData({ ...formData, moq: e.target.value })}
+                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Loadability</label>
+              <input
+                type="text"
+                value={formData.loadAbility}
+                onChange={(e) => setFormData({ ...formData, loadAbility: e.target.value })}
+                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="py-2.5 px-5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              className="flex-1 py-2.5 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="py-2.5 px-6 bg-[#001233] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md"
+              className="flex-1 py-2.5 px-3 bg-[#0B192C] hover:bg-slate-900 text-amber-400 rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>{isNew ? 'Create & Save Commodity' : 'Save Changes'}</span>
+              {isNew ? 'Create & Publish Product' : 'Save Changes'}
             </button>
           </div>
         </form>

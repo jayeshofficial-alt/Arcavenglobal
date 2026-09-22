@@ -21,15 +21,18 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { COMPANY_DETAILS, PRODUCTS } from '../data/productsData';
+import { SiteContent } from '../types';
 
 interface HeroProps {
   onExploreProducts: () => void;
   onRequestQuote: () => void;
+  siteContent?: SiteContent;
 }
 
 export const Hero: React.FC<HeroProps> = ({
   onExploreProducts,
-  onRequestQuote
+  onRequestQuote,
+  siteContent
 }) => {
   const [emailInput, setEmailInput] = useState('');
   const [companyInput, setCompanyInput] = useState('');
@@ -39,7 +42,11 @@ export const Hero: React.FC<HeroProps> = ({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showCommodityPreview, setShowCommodityPreview] = useState(false);
 
-  const contactEmail = 'contact@arcavenglobal.com';
+  const contactEmail = siteContent?.contactEmail || 'contact@arcavenglobal.com';
+  const heroBadge = siteContent?.heroBadge || 'Platform Under Setup';
+  const heroHeadline = siteContent?.heroHeadline || 'Building Strategic Global Partnerships — Launching Soon';
+  const legalDisclaimer = siteContent?.legalDisclaimer || 'Arca Ventures Global is currently completing standard corporate documentation and statutory legal formalities. Commercial operations, client onboarding, and platform features will launch shortly.';
+
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(contactEmail).then(() => {
@@ -123,7 +130,7 @@ export const Hero: React.FC<HeroProps> = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
               </span>
-              <span className="font-heading tracking-wide">Platform Under Setup</span>
+              <span className="font-heading tracking-wide">{heroBadge}</span>
             </div>
 
             <a
@@ -155,10 +162,7 @@ export const Hero: React.FC<HeroProps> = ({
               id="hero-primary-headline"
               className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-[3.35rem] font-extrabold tracking-tight text-white leading-[1.12]"
             >
-              Building Strategic Global Partnerships{' '}
-              <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-amber-200">
-                — Launching Soon
-              </span>
+              {heroHeadline}
             </h1>
 
             {/* Legal / Compliance Disclaimer (Exact wording required) */}
@@ -188,7 +192,7 @@ export const Hero: React.FC<HeroProps> = ({
                     id="compliance-disclaimer-text"
                     className="font-body text-slate-200 text-sm sm:text-[15px] leading-relaxed"
                   >
-                    Arca Ventures Global is currently completing standard corporate documentation and statutory legal formalities. Commercial operations, client onboarding, and platform features will launch shortly.
+                    {legalDisclaimer}
                   </p>
                 </div>
               </div>

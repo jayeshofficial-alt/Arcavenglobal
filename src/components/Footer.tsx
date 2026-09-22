@@ -1,23 +1,29 @@
 import React from 'react';
 import { COMPANY_DETAILS } from '../data/productsData';
 import { ArrowUp, Phone, Mail, MapPin, Globe } from 'lucide-react';
+import { SiteContent } from '../types';
 
 interface FooterProps {
   onOpenCustomerLogin?: () => void;
   onOpenAdminLogin?: () => void;
   onOpenAdminPanel?: () => void;
   isAdminLoggedIn?: boolean;
+  siteContent?: SiteContent;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenCustomerLogin,
   onOpenAdminLogin,
   onOpenAdminPanel,
-  isAdminLoggedIn
+  isAdminLoggedIn,
+  siteContent
 }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const footerDisclaimer = siteContent?.footerDisclaimer || '© 2026 Arca Ventures Global. Status: Regulatory Documentation & Filings in Progress.';
+
 
   return (
     <footer className="bg-[#001233] text-white border-t border-gray-900 relative font-body">
@@ -159,7 +165,7 @@ export const Footer: React.FC<FooterProps> = ({
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <div className="text-center sm:text-left font-body space-y-1">
             <p className="text-slate-200 font-medium">
-              © 2026 Arca Ventures Global. Status: Regulatory Documentation & Filings in Progress.
+              {footerDisclaimer}
             </p>
             <p className="text-[11px] text-slate-400">
               Official corporate domain: arcavenglobal.com • Liaison Desk: contact@arcavenglobal.com

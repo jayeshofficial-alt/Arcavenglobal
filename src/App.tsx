@@ -21,14 +21,19 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
-import { ProductItem, RfqItem, UserAccount } from './types';
+import { PaymentModal } from './components/PaymentModal';
+import { ProductItem, RfqItem, UserAccount, OrderRecord, SiteContent } from './types';
 import {
   getStoredProducts,
-  saveStoredProducts,
+  saveProducts,
+  getStoredOrders,
+  saveOrders,
+  getStoredSiteContent,
+  saveSiteContent,
   getCurrentSession,
   setCurrentSession,
   clearCurrentSession,
-  ADMIN_EMAIL
+  isSuperAdminIdentity
 } from './utils/storage';
 
 export default function App() {
@@ -37,9 +42,11 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
 
-  // Authentication & Dynamic Products State
+  // Authentication & Dynamic State
   const [products, setProducts] = useState<ProductItem[]>(() => getStoredProducts());
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentSession());
+  const [orders, setOrders] = useState<OrderRecord[]>(() => getStoredOrders());
+  const [siteContent, setSiteContent] = useState<SiteContent>(() => getStoredSiteContent());
 
   // Modal Visibilities
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
@@ -47,10 +54,15 @@ export default function App() {
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerPortalOpen, setIsCustomerPortalOpen] = useState(false);
 
+  // Payment Gateway Modal State
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [activePaymentOrder, setActivePaymentOrder] = useState<OrderRecord | null>(null);
+
   // Synchronize state with storage
   useEffect(() => {
-    const stored = getStoredProducts();
-    setProducts(stored);
+    setProducts(getStoredProducts());
+    setOrders(getStoredOrders());
+    setSiteContent(getStoredSiteContent());
   }, []);
 
   const handleAdminLoginSuccess = (user: UserAccount) => {
@@ -76,7 +88,34 @@ export default function App() {
 
   const handleProductsUpdated = (updatedProducts: ProductItem[]) => {
     setProducts(updatedProducts);
-    saveStoredProducts(updatedProducts);
+    saveProducts(updatedProducts);
+  };
+
+  const handleOrdersUpdated = (updatedOrders: OrderRecord[]) => {
+    setOrders(updatedOrders);
+    saveOrders(updatedOrders);
+  };
+
+  const handleSiteContentUpdated = (updatedContent: SiteContent) => {
+    setSiteContent(updatedContent);
+    saveSiteContent(updatedContent);
+  };
+
+  const handleOrderCreated = (newOrder: OrderRecord) => {
+    const updated = [newOrder, ...orders];
+    setOrders(updated);
+    saveOrders(updated);
+  };
+
+  const handleOpenPayment = (order: OrderRecord) => {
+    setActivePaymentOrder(order);
+    setIsPaymentOpen(true);
+  };
+
+  const handlePaymentSuccess = (updatedOrder: OrderRecord) => {
+    const updated = orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o));
+    setOrders(updated);
+    saveOrders(updated);
   };
 
   // Add to Quote Basket
@@ -134,7 +173,7 @@ export default function App() {
     }
   };
 
-  const isAdmin = currentUser?.role === 'admin' && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = currentUser ? isSuperAdminIdentity(currentUser.email) : false;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFCFB] text-[#1E293B]">
@@ -153,10 +192,11 @@ export default function App() {
 
       {/* Main Single-Page Sections */}
       <main className="flex-grow">
-        {/* Hero Section */}
+        {/* Hero Section with Dynamic Content and Status Badges */}
         <Hero
           onExploreProducts={scrollToProducts}
           onRequestQuote={() => setIsQuickQuoteOpen(true)}
+          siteContent={siteContent}
         />
 
         {/* About Us Section */}
@@ -185,12 +225,13 @@ export default function App() {
         <ContactSection />
       </main>
 
-      {/* Footer */}
+      {/* Footer with Dynamic Status & Filing Notice */}
       <Footer
         onOpenCustomerLogin={() => setIsCustomerAuthOpen(true)}
         onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         isAdminLoggedIn={isAdmin}
+        siteContent={siteContent}
       />
 
       {/* Product Detail "Learn More" Modal */}
@@ -200,7 +241,7 @@ export default function App() {
         onAddToCart={handleAddToCart}
       />
 
-      {/* RFQ / Sample Basket Drawer */}
+      {/* RFQ / Sample Basket Drawer with Instant Order Generation & Payment Option */}
       <RfqCartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -208,6 +249,8 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
+        onOrderCreated={handleOrderCreated}
+        onOpenPaymentModal={handleOpenPayment}
       />
 
       {/* Quick Quote Modal */}
@@ -219,20 +262,24 @@ export default function App() {
       {/* Floating WhatsApp Quick Connect */}
       <FloatingWhatsApp />
 
-      {/* Admin Login Modal (Restricted to jayeshofficial@gmail.com) */}
+      {/* Admin Login Modal (Restricted exclusively to jayeshofficial.com / jayeshofficial@gmail.com) */}
       <AdminLoginModal
         isOpen={isAdminLoginOpen}
         onClose={() => setIsAdminLoginOpen(false)}
         onLoginSuccess={handleAdminLoginSuccess}
       />
 
-      {/* Full Admin Panel Modal (Products CRUD & List/Delist, User Management & Passwords) */}
+      {/* Full Admin Panel Modal (5 Tabs: Orders, Products CRUD & Delist, Content, Customers, Security) */}
       <AdminPanelModal
         isOpen={isAdminPanelOpen}
         onClose={() => setIsAdminPanelOpen(false)}
         currentUser={currentUser}
         products={products}
         onProductsUpdated={handleProductsUpdated}
+        siteContent={siteContent}
+        onSiteContentUpdated={handleSiteContentUpdated}
+        orders={orders}
+        onOrdersUpdated={handleOrdersUpdated}
         onLogout={handleLogout}
       />
 
@@ -243,18 +290,24 @@ export default function App() {
         onLoginSuccess={handleCustomerLoginSuccess}
       />
 
-      {/* Customer Self-Service Portal Modal (Profile, Password Management & History) */}
+      {/* Customer Self-Service Portal Modal (Active Consignments, Invoices & Tracking, Profile, Password) */}
       <CustomerPortalModal
         isOpen={isCustomerPortalOpen}
         onClose={() => setIsCustomerPortalOpen(false)}
         currentUser={currentUser}
-        onUpdateUser={(updated) => {
-          setCurrentUser(updated);
-          setCurrentSession(updated);
-        }}
+        orders={orders}
+        onOrdersUpdated={handleOrdersUpdated}
+        onOpenPaymentForOrder={handleOpenPayment}
         onLogout={handleLogout}
+      />
+
+      {/* Multi-Method Digital Payment Gateway Modal (UPI QR, Credit/Debit, Net Banking) */}
+      <PaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        order={activePaymentOrder}
+        onPaymentSuccess={handlePaymentSuccess}
       />
     </div>
   );
 }
-
