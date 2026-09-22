@@ -26,6 +26,36 @@ export interface ProductItem {
   certifications: string[];
   highlights: string[];
   isFeatured?: boolean;
+  isDelisted?: boolean;
+}
+
+export type UserRole = 'admin' | 'customer';
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  password: string; // Plain/hashed client-side credentials
+  company?: string;
+  phone?: string;
+  country?: string;
+  status: 'active' | 'suspended';
+  createdAt: string;
+  lastLogin?: string;
+  notes?: string;
+}
+
+export interface CustomerInquiry {
+  id: string;
+  customerEmail: string;
+  customerName: string;
+  company?: string;
+  productName?: string;
+  quantity?: string;
+  message: string;
+  status: 'new' | 'reviewed' | 'quoted' | 'closed';
+  date: string;
 }
 
 export interface RfqItem {

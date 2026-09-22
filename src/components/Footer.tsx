@@ -2,7 +2,19 @@ import React from 'react';
 import { COMPANY_DETAILS } from '../data/productsData';
 import { ArrowUp, Phone, Mail, MapPin, Globe } from 'lucide-react';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  onOpenCustomerLogin?: () => void;
+  onOpenAdminLogin?: () => void;
+  onOpenAdminPanel?: () => void;
+  isAdminLoggedIn?: boolean;
+}
+
+export const Footer: React.FC<FooterProps> = ({
+  onOpenCustomerLogin,
+  onOpenAdminLogin,
+  onOpenAdminPanel,
+  isAdminLoggedIn
+}) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -88,6 +100,26 @@ export const Footer: React.FC = () => {
               <li><a href="#quality" className="hover:text-[#FF8C00] transition-colors">Quality Protocol</a></li>
               <li><a href="#gallery" className="hover:text-[#FF8C00] transition-colors">Photo Gallery</a></li>
               <li><a href="#contact" className="hover:text-[#FF8C00] transition-colors">Contact Trade Desk</a></li>
+              {onOpenCustomerLogin && (
+                <li>
+                  <button
+                    onClick={onOpenCustomerLogin}
+                    className="hover:text-emerald-400 transition-colors text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Client Portal & Login</span>
+                  </button>
+                </li>
+              )}
+              {onOpenAdminLogin && (
+                <li>
+                  <button
+                    onClick={isAdminLoggedIn && onOpenAdminPanel ? onOpenAdminPanel : onOpenAdminLogin}
+                    className="hover:text-amber-400 transition-colors text-left flex items-center gap-1.5 cursor-pointer text-amber-400/90 font-medium"
+                  >
+                    <span>Admin Gate (jayeshofficial@gmail.com)</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 

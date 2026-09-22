@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { AboutSection } from './components/AboutSection';
@@ -17,13 +17,67 @@ import { Footer } from './components/Footer';
 import { RfqCartDrawer } from './components/RfqCartDrawer';
 import { QuickQuoteModal } from './components/QuickQuoteModal';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
-import { ProductItem, RfqItem } from './types';
+import { AdminLoginModal } from './components/AdminLoginModal';
+import { AdminPanelModal } from './components/AdminPanelModal';
+import { CustomerAuthModal } from './components/CustomerAuthModal';
+import { CustomerPortalModal } from './components/CustomerPortalModal';
+import { ProductItem, RfqItem, UserAccount } from './types';
+import {
+  getStoredProducts,
+  saveStoredProducts,
+  getCurrentSession,
+  setCurrentSession,
+  clearCurrentSession,
+  ADMIN_EMAIL
+} from './utils/storage';
 
 export default function App() {
   const [cartItems, setCartItems] = useState<RfqItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
+
+  // Authentication & Dynamic Products State
+  const [products, setProducts] = useState<ProductItem[]>(() => getStoredProducts());
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentSession());
+
+  // Modal Visibilities
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
+  const [isCustomerPortalOpen, setIsCustomerPortalOpen] = useState(false);
+
+  // Synchronize state with storage
+  useEffect(() => {
+    const stored = getStoredProducts();
+    setProducts(stored);
+  }, []);
+
+  const handleAdminLoginSuccess = (user: UserAccount) => {
+    setCurrentSession(user);
+    setCurrentUser(user);
+    setIsAdminLoginOpen(false);
+    setIsAdminPanelOpen(true);
+  };
+
+  const handleCustomerLoginSuccess = (user: UserAccount) => {
+    setCurrentSession(user);
+    setCurrentUser(user);
+    setIsCustomerAuthOpen(false);
+    setIsCustomerPortalOpen(true);
+  };
+
+  const handleLogout = () => {
+    clearCurrentSession();
+    setCurrentUser(null);
+    setIsAdminPanelOpen(false);
+    setIsCustomerPortalOpen(false);
+  };
+
+  const handleProductsUpdated = (updatedProducts: ProductItem[]) => {
+    setProducts(updatedProducts);
+    saveStoredProducts(updatedProducts);
+  };
 
   // Add to Quote Basket
   const handleAddToCart = (
@@ -80,6 +134,8 @@ export default function App() {
     }
   };
 
+  const isAdmin = currentUser?.role === 'admin' && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFCFB] text-[#1E293B]">
       {/* Sticky Transparent-to-Solid Glassmorphism Navigation */}
@@ -87,6 +143,12 @@ export default function App() {
         cartItems={cartItems}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenQuickQuote={() => setIsQuickQuoteOpen(true)}
+        currentUser={currentUser}
+        onOpenCustomerLogin={() => setIsCustomerAuthOpen(true)}
+        onOpenCustomerPortal={() => setIsCustomerPortalOpen(true)}
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Single-Page Sections */}
@@ -100,11 +162,14 @@ export default function App() {
         {/* About Us Section */}
         <AboutSection />
 
-        {/* Product Categories & Catalog */}
+        {/* Product Categories & Dynamic Catalog with Delist Filter & Admin Banner */}
         <ProductCatalog
           onSelectProduct={(product) => setSelectedProduct(product)}
           onAddToCart={(product) => handleAddToCart(product, 1)}
           cartItems={cartItems}
+          products={products}
+          onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+          isAdminLoggedIn={isAdmin}
         />
 
         {/* Quality Protocol & Export Logistics */}
@@ -121,7 +186,12 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer
+        onOpenCustomerLogin={() => setIsCustomerAuthOpen(true)}
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        isAdminLoggedIn={isAdmin}
+      />
 
       {/* Product Detail "Learn More" Modal */}
       <ProductModal
@@ -148,6 +218,42 @@ export default function App() {
 
       {/* Floating WhatsApp Quick Connect */}
       <FloatingWhatsApp />
+
+      {/* Admin Login Modal (Restricted to jayeshofficial@gmail.com) */}
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onLoginSuccess={handleAdminLoginSuccess}
+      />
+
+      {/* Full Admin Panel Modal (Products CRUD & List/Delist, User Management & Passwords) */}
+      <AdminPanelModal
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
+        currentUser={currentUser}
+        products={products}
+        onProductsUpdated={handleProductsUpdated}
+        onLogout={handleLogout}
+      />
+
+      {/* Customer Login & Registration Modal */}
+      <CustomerAuthModal
+        isOpen={isCustomerAuthOpen}
+        onClose={() => setIsCustomerAuthOpen(false)}
+        onLoginSuccess={handleCustomerLoginSuccess}
+      />
+
+      {/* Customer Self-Service Portal Modal (Profile, Password Management & History) */}
+      <CustomerPortalModal
+        isOpen={isCustomerPortalOpen}
+        onClose={() => setIsCustomerPortalOpen(false)}
+        currentUser={currentUser}
+        onUpdateUser={(updated) => {
+          setCurrentUser(updated);
+          setCurrentSession(updated);
+        }}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

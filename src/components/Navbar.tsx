@@ -1,21 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Menu, X } from 'lucide-react';
-import { RfqItem } from '../types';
+import { ShoppingBag, Menu, X, User, ShieldCheck, Lock, LogOut } from 'lucide-react';
+import { RfqItem, UserAccount } from '../types';
+import { ADMIN_EMAIL } from '../utils/storage';
 
 interface NavbarProps {
   cartItems: RfqItem[];
   onOpenCart: () => void;
   onOpenQuickQuote: () => void;
+  currentUser: UserAccount | null;
+  onOpenCustomerLogin: () => void;
+  onOpenCustomerPortal: () => void;
+  onOpenAdminLogin: () => void;
+  onOpenAdminPanel: () => void;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   cartItems,
   onOpenCart,
   onOpenQuickQuote,
+  currentUser,
+  onOpenCustomerLogin,
+  onOpenCustomerPortal,
+  onOpenAdminLogin,
+  onOpenAdminPanel,
+  onLogout,
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
+
+  const isAdmin = currentUser?.role === 'admin' && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isCustomer = currentUser?.role === 'customer';
 
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -157,7 +173,56 @@ export const Navbar: React.FC<NavbarProps> = ({
                 })}
               </div>
 
-              <div className="flex items-center gap-3 pl-3 border-l border-gray-100">
+              <div className="flex items-center gap-2.5 pl-3 border-l border-gray-100">
+                {/* Customer Portal / Login Button */}
+                {isCustomer ? (
+                  <button
+                    id="nav-customer-portal-btn"
+                    onClick={onOpenCustomerPortal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold border border-emerald-200 transition-colors cursor-pointer"
+                    title={`Logged in as ${currentUser?.name}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <User className="w-3.5 h-3.5 text-emerald-700" />
+                    <span className="hidden xl:inline max-w-[100px] truncate">{currentUser?.name}</span>
+                    <span className="xl:hidden">Portal</span>
+                  </button>
+                ) : (
+                  <button
+                    id="nav-customer-login-btn"
+                    onClick={onOpenCustomerLogin}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                    title="Customer Login"
+                  >
+                    <User className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Client Login</span>
+                  </button>
+                )}
+
+                {/* Admin Console / Login Button */}
+                {isAdmin ? (
+                  <button
+                    id="nav-admin-console-btn"
+                    onClick={onOpenAdminPanel}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#001233] text-amber-400 text-xs font-semibold border border-amber-400/50 shadow-xs hover:bg-slate-900 transition-colors cursor-pointer"
+                    title="Admin Console (jayeshofficial@gmail.com)"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Admin Console</span>
+                  </button>
+                ) : (
+                  <button
+                    id="nav-admin-login-btn"
+                    onClick={onOpenAdminLogin}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-200/80 transition-colors cursor-pointer"
+                    title="Executive Admin (jayeshofficial@gmail.com)"
+                  >
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>Admin</span>
+                  </button>
+                )}
+
                 {/* RFQ Cart Icon */}
                 <button
                   id="cart-drawer-trigger"
@@ -178,7 +243,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="header-cta-quote-btn"
                   onClick={onOpenQuickQuote}
-                  className="bg-[#FF8C00] hover:bg-[#e67e00] text-white px-5 py-2 rounded-full font-heading text-[12px] font-bold tracking-wider uppercase orange-glow transition-all duration-200 active:scale-95 cursor-pointer"
+                  className="bg-[#FF8C00] hover:bg-[#e67e00] text-white px-4 py-2 rounded-full font-heading text-[12px] font-bold tracking-wider uppercase orange-glow transition-all duration-200 active:scale-95 cursor-pointer"
                 >
                   SHOP NOW
                 </button>
@@ -263,6 +328,80 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {link.name}
                   </a>
                 ))}
+              </div>
+
+              {/* Mobile Auth & Portal Links */}
+              <div className="pt-2 pb-4 border-t border-gray-100 space-y-2">
+                <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-gray-400 px-4 block">
+                  Portals & Management
+                </span>
+
+                {isCustomer ? (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenCustomerPortal();
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-emerald-600" />
+                      <span>Client Portal ({currentUser?.name})</span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-200/60 px-2 py-0.5 rounded font-mono">Active</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenCustomerLogin();
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold transition-colors"
+                  >
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span>Customer Sign In / Register</span>
+                  </button>
+                )}
+
+                {isAdmin ? (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAdminPanel();
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-[#001233] text-amber-400 text-xs font-semibold border border-amber-400/40"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                      <span>Admin Console (jayeshofficial@gmail.com)</span>
+                    </div>
+                    <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">Root</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAdminLogin();
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-200/80 transition-colors"
+                  >
+                    <Lock className="w-4 h-4 text-amber-600" />
+                    <span>Admin Gate (jayeshofficial@gmail.com)</span>
+                  </button>
+                )}
+
+                {(isCustomer || isAdmin) && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out ({currentUser?.email})</span>
+                  </button>
+                )}
               </div>
             </div>
 

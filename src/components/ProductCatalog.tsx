@@ -7,26 +7,39 @@ interface ProductCatalogProps {
   onSelectProduct: (product: ProductItem) => void;
   onAddToCart: (product: ProductItem) => void;
   cartItems: RfqItem[];
+  products?: ProductItem[];
+  onOpenAdminPanel?: () => void;
+  isAdminLoggedIn?: boolean;
 }
 
 export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   onSelectProduct,
   onAddToCart,
-  cartItems
+  cartItems,
+  products = PRODUCTS,
+  onOpenAdminPanel,
+  isAdminLoggedIn
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Public catalog displays only listed items
+  const activeProducts = useMemo(() => {
+    return products.filter(p => !p.isDelisted);
+  }, [products]);
+
+  const delistedCount = products.filter(p => p.isDelisted).length;
+
   const categories: { id: ProductCategory; label: string; icon: string; count: number }[] = [
-    { id: 'all', label: 'All Products', icon: '🌐', count: PRODUCTS.length },
-    { id: 'vegetables-fruits', label: 'Produce', icon: '🥥', count: PRODUCTS.filter(p => p.category === 'vegetables-fruits').length },
-    { id: 'grains-pulses', label: 'Grains', icon: '🌾', count: PRODUCTS.filter(p => p.category === 'grains-pulses').length },
-    { id: 'specialty-spices', label: 'Spices', icon: '🌶️', count: PRODUCTS.filter(p => p.category === 'specialty-spices').length },
-    { id: 'coconut-products', label: 'Coconut By-Products', icon: '🌴', count: PRODUCTS.filter(p => p.category === 'coconut-products').length },
+    { id: 'all', label: 'All Products', icon: '🌐', count: activeProducts.length },
+    { id: 'vegetables-fruits', label: 'Produce', icon: '🥥', count: activeProducts.filter(p => p.category === 'vegetables-fruits').length },
+    { id: 'grains-pulses', label: 'Grains', icon: '🌾', count: activeProducts.filter(p => p.category === 'grains-pulses').length },
+    { id: 'specialty-spices', label: 'Spices', icon: '🌶️', count: activeProducts.filter(p => p.category === 'specialty-spices').length },
+    { id: 'coconut-products', label: 'Coconut By-Products', icon: '🌴', count: activeProducts.filter(p => p.category === 'coconut-products').length },
   ];
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((product) => {
+    return activeProducts.filter((product) => {
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
       const matchesSearch =
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -35,7 +48,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
         product.categoryLabel.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [activeProducts, selectedCategory, searchQuery]);
 
   const isInCart = (productId: string) => {
     return cartItems.some(item => item.product.id === productId);
@@ -59,6 +72,32 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           </p>
           <div className="w-12 h-1 bg-[#FF8C00] mx-auto mt-4 rounded-full" />
         </div>
+
+        {/* Admin Quick Governance Bar if admin is viewing */}
+        {isAdminLoggedIn && (
+          <div className="mb-8 p-4 bg-[#001233] text-white rounded-xl border border-amber-400/40 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <div>
+                <span className="text-xs font-heading font-bold uppercase tracking-wider text-amber-400 block">
+                  Admin Active View (jayeshofficial@gmail.com)
+                </span>
+                <span className="text-xs text-slate-300">
+                  Showing <strong>{activeProducts.length}</strong> listed commodities. {delistedCount > 0 ? `(${delistedCount} commodities currently delisted and hidden from public visitors)` : '(All commodities currently listed)'}
+                </span>
+              </div>
+            </div>
+
+            {onOpenAdminPanel && (
+              <button
+                onClick={onOpenAdminPanel}
+                className="py-1.5 px-3.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Open Admin Console
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Category Tabs & Search Bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-10">
