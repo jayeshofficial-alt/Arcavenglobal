@@ -118,11 +118,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2.5 group transition-transform active:scale-95"
             >
               <div className="w-8 h-8 bg-[#001233] rounded-sm flex items-center justify-center text-white font-heading text-xs italic tracking-tighter shadow-xs">
-                AG
+                AVG
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[#001233] font-heading text-lg sm:text-xl font-bold tracking-tight">
-                  ARCAVEN <span className="text-[#FF8C00]">GLOBAL</span>
+                  ARCA VENTURES <span className="text-[#FF8C00]">GLOBAL</span>
                 </span>
                 <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -230,11 +230,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="flex items-center justify-between pb-5 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 bg-[#001233] rounded-sm flex items-center justify-center text-white font-heading text-xs italic">
-                    AG
+                    AVG
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[#001233] font-heading text-base font-bold">
-                      ARCAVEN <span className="text-[#FF8C00]">GLOBAL</span>
+                      ARCA VENTURES <span className="text-[#FF8C00]">GLOBAL</span>
                     </span>
                     <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-500">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>

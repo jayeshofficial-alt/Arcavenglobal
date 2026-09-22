@@ -17,21 +17,21 @@ export const Footer: React.FC = () => {
           <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-white/10 border border-white/20 rounded-sm flex items-center justify-center text-white font-heading text-xs italic">
-                AG
+                AVG
               </div>
               <span className="text-white font-heading text-lg font-bold tracking-tight">
-                ARCAVEN <span className="text-[#FF8C00]">GLOBAL</span>
+                ARCA VENTURES <span className="text-[#FF8C00]">GLOBAL</span>
               </span>
             </div>
             
             <p className="text-xs text-gray-400 leading-relaxed max-w-sm font-body">
-              Arcaven Global (arcavenglobal.com) — Building Global Trade & Partnerships. Currently completing standard corporate documentation and statutory legal formalities.
+              Arca Ventures Global (arcavenglobal.com) — Building Strategic Global Partnerships. Currently completing standard corporate documentation and statutory legal formalities. Commercial operations, client onboarding, and platform features will launch shortly.
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded inline-flex items-center gap-1.5 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                <span>Status: Pending Regulatory & Formal Filings</span>
+                <span>Status: Regulatory Documentation & Filings in Progress</span>
               </div>
             </div>
 
@@ -126,10 +126,11 @@ export const Footer: React.FC = () => {
         {/* Bottom Copyright Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <div className="text-center sm:text-left font-body space-y-1">
-            <p className="text-slate-300 font-medium">© {new Date().getFullYear()} Arcaven Global. All rights reserved.</p>
-            <p className="text-[11px] text-amber-300/80 flex items-center gap-1.5 justify-center sm:justify-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span>Status: Pending Regulatory & Formal Filings</span>
+            <p className="text-slate-200 font-medium">
+              © 2026 Arca Ventures Global. Status: Regulatory Documentation & Filings in Progress.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Official corporate domain: arcavenglobal.com • Liaison Desk: contact@arcavenglobal.com
             </p>
           </div>
 

@@ -429,9 +429,9 @@ export const TESTIMONIALS: TestimonialItem[] = [
 ];
 
 export const COMPANY_DETAILS = {
-  name: 'Arcaven Global',
-  legalName: 'Arcaven Global',
-  tagline: 'Building Global Trade & Partnerships',
+  name: 'Arca Ventures Global',
+  legalName: 'Arca Ventures Global',
+  tagline: 'Building Strategic Global Partnerships',
   domain: 'arcavenglobal.com',
   establishedYear: '2024',
   headquarters: {
