@@ -4,7 +4,7 @@
  * and routes WhatsApp details to +91 9860215449
  */
 
-export const TARGET_INQUIRY_EMAIL = 'info@arcavenglobal.com';
+export const TARGET_INQUIRY_EMAIL = 'contact@arcavenglobal.com';
 export const TARGET_WHATSAPP_NUMBER = '919860215449';
 export const TARGET_WHATSAPP_DISPLAY = '+91 9860215449';
 

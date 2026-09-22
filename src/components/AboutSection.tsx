@@ -18,7 +18,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
         {/* Section Header (Editorial Style) */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="text-[#2D5A27] font-heading font-semibold tracking-widest text-xs uppercase mb-3 block">
-            About Arcaventure Global
+            About Arcaven Global
           </span>
           
           <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold text-[#001233] tracking-tight">
@@ -111,11 +111,11 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
             
             <div className="space-y-4">
               <h3 className="font-heading text-2xl sm:text-3xl font-bold text-[#001233] leading-snug">
-                Arcaventure Global is a premier merchant exporter delivering authentic Indian agricultural excellence.
+                Arcaven Global is a premier merchant exporter delivering authentic Indian agricultural excellence.
               </h3>
               
               <p className="text-slate-600 font-body text-sm sm:text-base leading-relaxed">
-                Headquartered in the vibrant trade city of <strong className="text-[#001233]">Pune</strong>, Arcaventure Global specializes in sourcing, processing, and exporting certified organic fresh vegetables, premium 1121 Basmati rice, handpicked Indian spices, and natural coconut by-products to international buyers across the Middle East, Europe, North America, and Asia-Pacific.
+                Headquartered in the vibrant trade city of <strong className="text-[#001233]">Pune</strong>, Arcaven Global specializes in sourcing, processing, and exporting certified organic fresh vegetables, premium 1121 Basmati rice, handpicked Indian spices, and natural coconut by-products to international buyers across the Middle East, Europe, North America, and Asia-Pacific.
               </p>
 
               <p className="text-slate-600 font-body text-xs sm:text-sm leading-relaxed">

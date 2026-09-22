@@ -20,16 +20,19 @@ export const Footer: React.FC = () => {
                 AG
               </div>
               <span className="text-white font-heading text-lg font-bold tracking-tight">
-                ARCAVENTURE <span className="text-[#FF8C00]">GLOBAL</span>
+                ARCAVEN <span className="text-[#FF8C00]">GLOBAL</span>
               </span>
             </div>
             
             <p className="text-xs text-gray-400 leading-relaxed max-w-sm font-body">
-              Arcaventure Global (arcavenglobal.com) is an Indian merchant exporter supplying certified organic fresh produce, grains, spices, and coconut derivatives across 38+ countries with strict phytosanitary quality protocols.
+              Arcaven Global (arcavenglobal.com) — Building Global Trade & Partnerships. Currently completing standard corporate documentation and statutory legal formalities.
             </p>
 
-            <div className="text-[11px] text-[#2D5A27] bg-[#2D5A27]/20 border border-[#2D5A27]/40 px-3 py-1 rounded inline-block font-semibold">
-              Certified Merchant Exporter • Global Quality Protocols
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded inline-flex items-center gap-1.5 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>Status: Pending Regulatory & Formal Filings</span>
+              </div>
             </div>
 
             {/* Social Text Badges (Editorial Style) */}
@@ -122,8 +125,12 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Copyright Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
-          <div className="text-center sm:text-left font-body">
-            <p>© {new Date().getFullYear()} Arcaventure Global (arcavenglobal.com). All Rights Reserved.</p>
+          <div className="text-center sm:text-left font-body space-y-1">
+            <p className="text-slate-300 font-medium">© {new Date().getFullYear()} Arcaven Global. All rights reserved.</p>
+            <p className="text-[11px] text-amber-300/80 flex items-center gap-1.5 justify-center sm:justify-start">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>Status: Pending Regulatory & Formal Filings</span>
+            </p>
           </div>
 
           <div className="flex items-center gap-4">

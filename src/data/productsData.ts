@@ -429,11 +429,11 @@ export const TESTIMONIALS: TestimonialItem[] = [
 ];
 
 export const COMPANY_DETAILS = {
-  name: 'Arcaventure Global',
-  legalName: 'Arcaventure Global Exim Private Limited',
-  tagline: 'Global Excellence in Organic Nutrition',
+  name: 'Arcaven Global',
+  legalName: 'Arcaven Global',
+  tagline: 'Building Global Trade & Partnerships',
   domain: 'arcavenglobal.com',
-  establishedYear: '2012',
+  establishedYear: '2024',
   headquarters: {
     addressLine1: 'Pimple Gurav',
     addressLine2: 'Pune, Maharashtra',
@@ -445,9 +445,9 @@ export const COMPANY_DETAILS = {
   contact: {
     phonePrimary: '+91 9860215449',
     whatsapp: '+919860215449',
-    emailPrimary: 'info@arcavenglobal.com',
+    emailPrimary: 'contact@arcavenglobal.com',
     emailSecondary: 'export@arcavenglobal.com',
-    supportDesk: 'trade@arcavenglobal.com'
+    supportDesk: 'contact@arcavenglobal.com'
   },
   certifications: [
     { name: 'Spices Board India', label: 'Registered Spice Exporter' },
