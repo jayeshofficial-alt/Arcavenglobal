@@ -391,7 +391,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               className="text-[#0B192C] hover:text-amber-600 font-bold flex items-center gap-1.5 cursor-pointer"
             >
               <Lock className="w-3.5 h-3.5 text-amber-500" />
-              <span>Super Admin Gate ({SUPER_ADMIN_IDENTITY})</span>
+              <span>Super Admin Gate</span>
             </button>
           </div>
         </div>

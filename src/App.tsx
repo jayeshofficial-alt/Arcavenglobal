@@ -258,6 +258,7 @@ export default function App() {
         onClearCart={handleClearCart}
         onOrderCreated={handleOrderCreated}
         onOpenPaymentModal={handleOpenPayment}
+        bankingSettings={bankingSettings}
       />
 
       {/* Quick Quote Modal */}

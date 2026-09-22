@@ -15,7 +15,8 @@ import {
   Receipt,
   ExternalLink,
   Check,
-  Building
+  Building,
+  ShieldAlert
 } from 'lucide-react';
 import { OrderRecord, PaymentMethod, BankingSettings } from '../types';
 import { getStoredBankingSettings, recordOrderPayment } from '../utils/storage';
@@ -66,6 +67,78 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // Resolve active banking settings (from props or local storage)
   const activeBanking = propBankingSettings || getStoredBankingSettings();
+
+  // Compliance / Maintenance Kill-Switch Interceptor
+  if (activeBanking.isGatewayActive === false) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B192C]/85 backdrop-blur-md animate-fadeIn font-body">
+        <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 sm:p-8 space-y-6">
+          <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 flex-shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-heading text-lg font-bold text-slate-900 leading-snug">
+                  Commercial Transaction Portal
+                </h3>
+                <span className="text-xs text-amber-700 font-mono font-semibold flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  Statutory Compliance & Maintenance Mode
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              title="Close Notice"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-4 sm:p-5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-heading font-bold uppercase tracking-wider text-amber-900">
+              <Lock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>Official Corporate Notice</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-body">
+              {activeBanking.suspensionNotice || "Corporate Notice: Our transactional portal is currently undergoing scheduled platform maintenance while Arca Ventures Global completes statutory legal compliance and international import documentation. Commercial onboarding will resume shortly. For priority inquiries, please contact our administrative desk directly."}
+            </p>
+          </div>
+
+          <div className="space-y-2.5 text-xs text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-heading uppercase text-[10px] tracking-wider">Consignment Reference:</span>
+              <strong className="font-mono text-slate-900 font-bold">#{order.orderNumber}</strong>
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-heading uppercase text-[10px] tracking-wider">Consignee Importer:</span>
+              <span className="font-semibold text-slate-800">{order.customerName} ({order.company || 'Consignee'})</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-heading uppercase text-[10px] tracking-wider">Administrative Desk:</span>
+              <span className="font-mono text-slate-800 font-medium">contact@arcavenglobal.com</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 font-heading uppercase text-[10px] tracking-wider">Root Governance:</span>
+              <span className="font-mono text-slate-800 font-medium">jayeshofficial.com</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 px-4 bg-[#0B192C] hover:bg-slate-900 text-amber-400 rounded-xl text-xs font-heading font-bold uppercase tracking-wider transition-colors shadow-md cursor-pointer"
+            >
+              Return to Consignment Desk
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalAmount = order.totalEstimatedValue || 15000;
   const inrEquivalent = Math.round(totalAmount * 84);

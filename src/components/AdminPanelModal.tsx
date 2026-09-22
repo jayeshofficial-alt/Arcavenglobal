@@ -29,6 +29,13 @@ import {
   updateOrderStatus,
   deleteOrder,
   cancelOrder,
+  softDeleteOrder,
+  softDeleteOrdersBulk,
+  restoreOrder,
+  restoreOrdersBulk,
+  permanentlyPurgeOrder,
+  permanentlyPurgeOrdersBulk,
+  emptyTrashOrders,
   getStoredBankingSettings,
   saveBankingSettings,
   resetBankingSettings,
@@ -72,7 +79,12 @@ import {
   QrCode,
   Smartphone,
   Save,
-  Ban
+  Ban,
+  Archive,
+  CheckSquare,
+  Square,
+  AlertOctagon,
+  Power
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -118,7 +130,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'content' | 'customers' | 'banking' | 'security'>('orders');
   
-  // Orders State
+  // Orders State & Two-Tier Soft-Delete Architecture
+  const [orderSubView, setOrderSubView] = useState<'active' | 'trash'>('active');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [orderSearch, setOrderSearch] = useState('');
   const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all');
   
@@ -131,10 +145,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [carrierNoticeInput, setCarrierNoticeInput] = useState('Customs cleared and freight carrier assigned.');
 
-  // Order Cancellation & Deletion Safeguard Modals
+  // Order Cancellation, Soft-Delete (Tier 1) & Permanent Purge (Tier 2) Modals
   const [cancellingOrder, setCancellingOrder] = useState<OrderRecord | null>(null);
   const [cancellationReasonInput, setCancellationReasonInput] = useState('Consignment requirement revised by consignee.');
-  const [deletingOrder, setDeletingOrder] = useState<OrderRecord | null>(null);
+  const [softDeletingOrder, setSoftDeletingOrder] = useState<OrderRecord | null>(null);
+  const [purgingOrder, setPurgingOrder] = useState<OrderRecord | null>(null);
+  const [isPurgingBulk, setIsPurgingBulk] = useState(false);
+  const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
 
   // Banking Settings State
   const [bankingForm, setBankingForm] = useState<BankingSettings>(() => propBankingSettings || getStoredBankingSettings());
@@ -206,8 +223,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     );
   }
 
-  // Filtered Orders
+  // Counts for Sub-Views
+  const activeOrdersCount = orders.filter(o => !o.isDeleted).length;
+  const trashOrdersCount = orders.filter(o => !!o.isDeleted).length;
+
+  // Filtered Orders Partitioned by Active vs. Trash Sub-View
   const filteredOrders = orders.filter(ord => {
+    // Partition by orderSubView
+    const isOrderInSubView = orderSubView === 'trash' ? !!ord.isDeleted : !ord.isDeleted;
+    if (!isOrderInSubView) return false;
+
     const matchesSearch = 
       ord.orderNumber.toLowerCase().includes(orderSearch.toLowerCase()) ||
       ord.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -219,6 +244,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (orderFilter !== 'all' && ord.status !== orderFilter) return false;
     return true;
   });
+
+  // Multi-select helper functions
+  const handleToggleSelectOrder = (id: string) => {
+    setSelectedOrderIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(filteredOrders.map(o => o.id));
+    }
+  };
 
   // Filtered Products
   const filteredProducts = products.filter(prod => {
@@ -330,13 +370,75 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setCancellationReasonInput('');
   };
 
-  const handleConfirmDeleteOrder = () => {
-    if (!deletingOrder) return;
-    deleteOrder(deletingOrder.id);
+  // TIER 1: Soft Delete (single)
+  const handleConfirmSoftDelete = (order: OrderRecord) => {
+    softDeleteOrder(order.id, currentUser?.name || 'Super Admin');
     const allOrders = getStoredOrders();
     onOrdersUpdated(allOrders);
-    showToast(`Order #${deletingOrder.orderNumber} permanently deleted.`);
-    setDeletingOrder(null);
+    setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
+    showToast(`Order #${order.orderNumber} moved to Deleted Orders / Trash Archive.`);
+    setSoftDeletingOrder(null);
+  };
+
+  // TIER 1: Soft Delete (bulk)
+  const handleBulkSoftDelete = () => {
+    if (selectedOrderIds.length === 0) return;
+    softDeleteOrdersBulk(selectedOrderIds, currentUser?.name || 'Super Admin');
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`${selectedOrderIds.length} orders moved to Deleted Orders / Trash Archive.`);
+    setSelectedOrderIds([]);
+  };
+
+  // RESTORE: Move back to Active Pipeline (single)
+  const handleRestoreOrder = (order: OrderRecord) => {
+    restoreOrder(order.id);
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
+    showToast(`Order #${order.orderNumber} successfully restored to Active Consignments.`);
+  };
+
+  // RESTORE: Move back to Active Pipeline (bulk)
+  const handleBulkRestore = () => {
+    if (selectedOrderIds.length === 0) return;
+    restoreOrdersBulk(selectedOrderIds);
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`${selectedOrderIds.length} orders restored to Active Consignments.`);
+    setSelectedOrderIds([]);
+  };
+
+  // TIER 2: Permanent Purge (single)
+  const handleConfirmPermanentPurge = () => {
+    if (!purgingOrder) return;
+    permanentlyPurgeOrder(purgingOrder.id);
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    setSelectedOrderIds(prev => prev.filter(id => id !== purgingOrder.id));
+    showToast(`Order #${purgingOrder.orderNumber} and all its transaction logs were permanently purged.`);
+    setPurgingOrder(null);
+  };
+
+  // TIER 2: Permanent Purge (bulk)
+  const handleConfirmBulkPurge = () => {
+    if (selectedOrderIds.length === 0) return;
+    permanentlyPurgeOrdersBulk(selectedOrderIds);
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`${selectedOrderIds.length} orders and audit trails permanently purged.`);
+    setSelectedOrderIds([]);
+    setIsPurgingBulk(false);
+  };
+
+  // TIER 2: Empty Trash
+  const handleConfirmEmptyTrash = () => {
+    emptyTrashOrders();
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    setSelectedOrderIds([]);
+    setIsEmptyingTrash(false);
+    showToast('Trash archive completely purged.');
   };
 
   // Banking Settings Actions
@@ -612,7 +714,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               }`}
             >
               <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-              <span>Payment Gateway & Banking</span>
+              <span>Treasury & Payment Gateway</span>
+              {bankingForm.isGatewayActive === false && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse ml-0.5" title="Gateway Suspended" />
+              )}
             </button>
 
             <button
@@ -635,10 +740,88 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           {/* TAB 1: ORDER & RFQ COMMAND CENTER */}
           {activeTab === 'orders' && (
             <div className="space-y-4">
-              {/* Order Controls Bar */}
+              {/* Two-Tier Repository Sub-Navigation */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderSubView('active');
+                      setSelectedOrderIds([]);
+                    }}
+                    className={`py-2 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                      orderSubView === 'active'
+                        ? 'bg-[#0B192C] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Active Consignments</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      orderSubView === 'active' ? 'bg-amber-400 text-slate-900' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {activeOrdersCount}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderSubView('trash');
+                      setSelectedOrderIds([]);
+                    }}
+                    className={`py-2 px-3.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                      orderSubView === 'trash'
+                        ? 'bg-amber-950 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <Archive className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Deleted Orders / Archive</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      orderSubView === 'trash' ? 'bg-amber-400 text-slate-900' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {trashOrdersCount}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-500 flex items-center gap-3">
+                  {orderSubView === 'active' ? (
+                    <>
+                      <span>Pending Confirmation: <strong className="text-amber-600 font-bold">{orders.filter(o => !o.isDeleted && o.status === 'Order Received').length}</strong></span>
+                      <span>•</span>
+                      <span>In-Transit / Dispatched: <strong className="text-emerald-700 font-bold">{orders.filter(o => !o.isDeleted && (o.status === 'Order In-Process' || o.status === 'Order Dispatched')).length}</strong></span>
+                    </>
+                  ) : (
+                    <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md text-[11px] font-medium">
+                      Archived / Soft-deleted orders retain full proforma history until permanently purged.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Search, Filter & Multi-Select Controls Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="relative min-w-[260px]">
+                  {/* Select All Checkbox */}
+                  {filteredOrders.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFiltered}
+                      className="py-1.5 px-2.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      title={selectedOrderIds.length === filteredOrders.length ? "Deselect all" : "Select all filtered"}
+                    >
+                      {selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0 ? (
+                        <CheckSquare className="w-4 h-4 text-[#0B192C]" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                      <span>Select All</span>
+                    </button>
+                  )}
+
+                  <div className="relative min-w-[240px]">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="text"
@@ -655,7 +838,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     onChange={(e) => setOrderFilter(e.target.value as any)}
                     className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-[#0B192C]"
                   >
-                    <option value="all">All Statuses ({orders.length})</option>
+                    <option value="all">All Statuses ({filteredOrders.length})</option>
                     <option value="Order Received">Order Received</option>
                     <option value="Order Confirmed">Order Confirmed</option>
                     <option value="Order In-Process">Order In-Process</option>
@@ -665,10 +848,62 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </select>
                 </div>
 
-                <div className="text-xs text-slate-500 flex items-center gap-3">
-                  <span>Pending Confirmation: <strong className="text-amber-600 font-bold">{orders.filter(o => o.status === 'Order Received').length}</strong></span>
-                  <span>•</span>
-                  <span>In-Process / Dispatched: <strong className="text-emerald-700 font-bold">{orders.filter(o => o.status === 'Order In-Process' || o.status === 'Order Dispatched').length}</strong></span>
+                {/* Bulk Actions Toolbar */}
+                <div className="flex items-center gap-2">
+                  {selectedOrderIds.length > 0 ? (
+                    <div className="flex items-center gap-2 animate-fadeIn">
+                      <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded">
+                        {selectedOrderIds.length} Selected
+                      </span>
+
+                      {orderSubView === 'active' ? (
+                        <button
+                          type="button"
+                          onClick={handleBulkSoftDelete}
+                          className="py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          <span>Move to Trash ({selectedOrderIds.length})</span>
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleBulkRestore}
+                            className="py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Restore Selected ({selectedOrderIds.length})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsPurgingBulk(true)}
+                            className="py-1.5 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                          >
+                            <AlertOctagon className="w-3.5 h-3.5" />
+                            <span>Purge Selected ({selectedOrderIds.length})</span>
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderIds([])}
+                        className="py-1.5 px-2 text-slate-500 hover:text-slate-800 text-xs cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : orderSubView === 'trash' && trashOrdersCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsEmptyingTrash(true)}
+                      className="py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <AlertOctagon className="w-3.5 h-3.5 text-red-600" />
+                      <span>Empty Trash Archive ({trashOrdersCount})</span>
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -676,7 +911,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="space-y-3">
                 {filteredOrders.length === 0 ? (
                   <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400 text-xs">
-                    No orders or RFQs match your filter criteria.
+                    {orderSubView === 'active' 
+                      ? 'No active orders match your search or filter.' 
+                      : 'Trash archive is empty. Soft-deleted orders will appear here.'}
                   </div>
                 ) : (
                   filteredOrders.map((ord) => {
@@ -689,14 +926,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       'Delivered': 'bg-slate-100 text-slate-800 border-slate-300'
                     };
 
+                    const isSelected = selectedOrderIds.includes(ord.id);
+
                     return (
                       <div 
                         key={ord.id}
-                        className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs hover:border-slate-300 transition-all space-y-3"
+                        className={`bg-white rounded-xl border p-4 sm:p-5 shadow-xs transition-all space-y-3 ${
+                          isSelected ? 'border-amber-400 bg-amber-50/20' : 'border-slate-200 hover:border-slate-300'
+                        }`}
                       >
                         {/* Top Line */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                           <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectOrder(ord.id)}
+                              className="w-4 h-4 rounded text-[#0B192C] focus:ring-0 cursor-pointer"
+                            />
                             <span className="font-heading font-bold text-slate-900 text-base font-mono">
                               {ord.orderNumber}
                             </span>
@@ -706,33 +953,65 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             <span className="text-[11px] text-slate-400 font-mono">
                               {new Date(ord.createdAt).toLocaleDateString()}
                             </span>
+
+                            {ord.isDeleted && (
+                              <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 border border-red-200 text-[10px] font-bold font-mono">
+                                Archived on {new Date(ord.deletedAt || ord.updatedAt).toLocaleDateString()} by {ord.deletedBy || 'Super Admin'}
+                              </span>
+                            )}
                           </div>
 
-                          {/* Status Transition Control Dropdown & Permanent Deletion Safeguard */}
+                          {/* Control Buttons Based on Sub-View */}
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-slate-500 font-semibold font-heading uppercase">
-                              Update Flow:
-                            </span>
-                            <select
-                              value={ord.status}
-                              onChange={(e) => handleStatusChangeRequest(ord, e.target.value as OrderStatus)}
-                              className="px-3 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-[#0B192C] focus:outline-none focus:border-[#0B192C] cursor-pointer"
-                            >
-                              <option value="Order Received">Order Received</option>
-                              <option value="Order Confirmed">Order Confirmed (Verify Payment Ref)</option>
-                              <option value="Order In-Process">Order In-Process</option>
-                              <option value="Order Dispatched">Order Dispatched (Set Delivery TAT)</option>
-                              <option value="Order Cancelled">Order Cancelled (Record Reason)</option>
-                              <option value="Delivered">Delivered</option>
-                            </select>
+                            {orderSubView === 'active' ? (
+                              <>
+                                <span className="text-[11px] text-slate-500 font-semibold font-heading uppercase">
+                                  Update Flow:
+                                </span>
+                                <select
+                                  value={ord.status}
+                                  onChange={(e) => handleStatusChangeRequest(ord, e.target.value as OrderStatus)}
+                                  className="px-3 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-[#0B192C] focus:outline-none focus:border-[#0B192C] cursor-pointer"
+                                >
+                                  <option value="Order Received">Order Received</option>
+                                  <option value="Order Confirmed">Order Confirmed (Verify Payment Ref)</option>
+                                  <option value="Order In-Process">Order In-Process</option>
+                                  <option value="Order Dispatched">Order Dispatched (Set Delivery TAT)</option>
+                                  <option value="Order Cancelled">Order Cancelled (Record Reason)</option>
+                                  <option value="Delivered">Delivered</option>
+                                </select>
 
-                            <button
-                              onClick={() => setDeletingOrder(ord)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                              title="Permanently Delete Order Safeguard"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSoftDeletingOrder(ord)}
+                                  className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Move to Deleted Orders / Trash Archive (Tier 1)"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRestoreOrder(ord)}
+                                  className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Restore Consignment</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setPurgingOrder(ord)}
+                                  className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
+                                  title="Permanently Purge (Tier 2)"
+                                >
+                                  <AlertOctagon className="w-3.5 h-3.5 text-red-600" />
+                                  <span>Permanent Purge</span>
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -1387,6 +1666,79 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Left Form: 7 Columns */}
                   <form onSubmit={handleSaveBankingSettings} className="lg:col-span-7 space-y-4">
+                    {/* Compliance / Maintenance Kill-Switch Card */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                        <div>
+                          <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-1.5">
+                            <Power className="w-4 h-4 text-amber-600" />
+                            <span>Payment Gateway Status & Kill-Switch</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Toggle client checkout availability during regulatory audits or platform maintenance.
+                          </p>
+                        </div>
+
+                        {/* Toggle Buttons */}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setBankingForm({ ...bankingForm, isGatewayActive: true })}
+                            className={`py-1 px-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                              bankingForm.isGatewayActive !== false
+                                ? 'bg-emerald-700 text-white shadow-xs'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            Active
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBankingForm({ ...bankingForm, isGatewayActive: false })}
+                            className={`py-1 px-2.5 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                              bankingForm.isGatewayActive === false
+                                ? 'bg-amber-600 text-white shadow-xs'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            Suspended
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Status Banner */}
+                      {bankingForm.isGatewayActive === false ? (
+                        <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-lg text-amber-950 text-xs space-y-2">
+                          <div className="flex items-center gap-1.5 font-bold font-heading uppercase text-[11px] text-amber-900">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                            <span>Gateway Suspended: Maintenance / Statutory Mode Active</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 leading-relaxed">
+                            Client checkout is currently locked. The proforma drawer and payment modals display your corporate maintenance notice instead of payment inputs.
+                          </p>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                              Custom Suspension Notice
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={bankingForm.suspensionNotice || ''}
+                              onChange={(e) => setBankingForm({ ...bankingForm, suspensionNotice: e.target.value })}
+                              placeholder="Corporate Notice: Our transactional portal is currently undergoing scheduled platform maintenance..."
+                              className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          <span className="font-medium">
+                            Gateway Active: Real-time QR and card settlements are available to all institutional clients.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Primary Receiver Section */}
                     <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
@@ -1541,44 +1893,64 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         <span className="text-[10px] text-slate-400 font-mono">Simulated Checkout</span>
                       </div>
 
-                      {/* Preview QR Box */}
-                      <div className="bg-white text-slate-900 p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
-                        <div className="w-36 h-36 bg-white p-1 rounded-lg flex items-center justify-center">
-                          <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(`upi://pay?pa=${bankingForm.upiId}&pn=${encodeURIComponent(bankingForm.accountHolderName)}&cu=INR`)}`}
-                            alt="Live Generated QR Preview"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1">
-                          <Smartphone className="w-3 h-3 text-emerald-600" />
-                          <span>Scan to Pay ({bankingForm.upiId})</span>
-                        </span>
-                      </div>
+                      {/* Gateway Active: Preview QR Box & Credentials */}
+                      {bankingForm.isGatewayActive !== false ? (
+                        <>
+                          <div className="bg-white text-slate-900 p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
+                            <div className="w-36 h-36 bg-white p-1 rounded-lg flex items-center justify-center">
+                              <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(`upi://pay?pa=${bankingForm.upiId}&pn=${encodeURIComponent(bankingForm.accountHolderName)}&cu=INR`)}`}
+                                alt="Live Generated QR Preview"
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1">
+                              <Smartphone className="w-3 h-3 text-emerald-600" />
+                              <span>Scan to Pay ({bankingForm.upiId})</span>
+                            </span>
+                          </div>
 
-                      {/* Displayed Credentials */}
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                          <span className="text-slate-400">Account Holder:</span>
-                          <strong className="text-white">{bankingForm.accountHolderName}</strong>
+                          {/* Displayed Credentials */}
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                              <span className="text-slate-400">Account Holder:</span>
+                              <strong className="text-white">{bankingForm.accountHolderName}</strong>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                              <span className="text-slate-400">Receiver UPI ID:</span>
+                              <strong className="font-mono text-amber-300">{bankingForm.upiId}</strong>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                              <span className="text-slate-400">Bank Name:</span>
+                              <span className="text-slate-200">{bankingForm.bankName}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                              <span className="text-slate-400">Account #:</span>
+                              <span className="font-mono text-slate-200">{bankingForm.accountNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">IFSC / Code:</span>
+                              <span className="font-mono text-slate-200">{bankingForm.ifscCode}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        /* Gateway Suspended: Preview Customer Maintenance Banner */
+                        <div className="p-4 rounded-xl bg-amber-950/60 border border-amber-500/40 text-left space-y-3">
+                          <div className="flex items-center gap-2 text-amber-400">
+                            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                            <h5 className="font-heading font-bold text-xs uppercase tracking-wider">
+                              Customer View: Transaction Portal Suspended
+                            </h5>
+                          </div>
+                          <p className="text-xs text-amber-100/90 leading-relaxed font-body">
+                            {bankingForm.suspensionNotice || "Corporate Notice: Our transactional portal is currently undergoing scheduled platform maintenance while Arca Ventures Global completes statutory legal compliance and international import documentation. Commercial onboarding will resume shortly. For priority inquiries, please contact our administrative desk directly."}
+                          </p>
+                          <div className="p-2.5 bg-black/40 rounded-lg border border-amber-400/20 text-[11px] font-mono text-amber-200">
+                            Status: Proforma checkout inputs disabled. Institutional support hotlines displayed.
+                          </div>
                         </div>
-                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                          <span className="text-slate-400">Receiver UPI ID:</span>
-                          <strong className="font-mono text-amber-300">{bankingForm.upiId}</strong>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                          <span className="text-slate-400">Bank Name:</span>
-                          <span className="text-slate-200">{bankingForm.bankName}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                          <span className="text-slate-400">Account #:</span>
-                          <span className="font-mono text-slate-200">{bankingForm.accountNumber}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">IFSC / Code:</span>
-                          <span className="font-mono text-slate-200">{bankingForm.ifscCode}</span>
-                        </div>
-                      </div>
+                      )}
 
                       <div className="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300 leading-relaxed">
                         Whenever any field on the left is updated and saved, all modal checkouts across arcavenglobal.com immediately adapt to this receiver account.
@@ -1870,48 +2242,215 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         )}
 
-        {/* MODAL: ORDER DELETION SAFEGUARD DIALOG */}
-        {deletingOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
-            <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 shadow-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-red-100 pb-3">
+        {/* MODAL: TIER 1 SOFT-DELETE SAFEGUARD */}
+        {softDeletingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-                    <Trash2 className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Archive className="w-4 h-4" />
                   </div>
                   <h3 className="font-heading font-bold text-slate-900 text-base">
-                    Delete Order #{deletingOrder.orderNumber}?
+                    Move Order #{softDeletingOrder.orderNumber} to Trash?
                   </h3>
                 </div>
                 <button
-                  onClick={() => setDeletingOrder(null)}
+                  onClick={() => setSoftDeletingOrder(null)}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-3 bg-red-50 rounded-xl border border-red-100 text-red-800 text-xs leading-relaxed space-y-1">
-                <span className="font-bold block">Permanent Deletion Safeguard:</span>
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs leading-relaxed space-y-1">
+                <span className="font-bold block">Soft-Delete (Tier 1 Archive):</span>
                 <p>
-                  Are you sure you want to permanently delete order <strong>#{deletingOrder.orderNumber}</strong> for {deletingOrder.customerName}? This action will remove the record from browser storage and order tracking. This action cannot be undone.
+                  Order <strong>#{softDeletingOrder.orderNumber}</strong> ({softDeletingOrder.customerName}) will be moved out of the active operational pipeline and placed into the <strong>Deleted Orders / Archive</strong> repository.
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  You can restore it back to the active queue at any time.
                 </p>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setDeletingOrder(null)}
+                  onClick={() => setSoftDeletingOrder(null)}
                   className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmDeleteOrder}
-                  className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                  onClick={() => handleConfirmSoftDelete(softDeletingOrder)}
+                  className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
                 >
-                  Delete Permanently
+                  Move to Trash Bin
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: TIER 2 PERMANENT PURGE SAFEGUARD (Single) */}
+        {purgingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                    <AlertOctagon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-red-950 text-base leading-tight">
+                      Permanent Purge (Tier 2)
+                    </h3>
+                    <span className="text-[10px] text-red-600 font-mono font-bold uppercase">Irreversible Action</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPurgingOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-red-900 text-xs leading-relaxed space-y-2">
+                <div className="flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wider text-red-700">
+                  <ShieldAlert className="w-4 h-4 text-red-600" />
+                  <span>Permanent Purge Warning</span>
+                </div>
+                <p>
+                  This action is <strong>irreversible and purges all transaction logs</strong>, financial audit trails, client notes, and proforma history for order <strong>#{purgingOrder.orderNumber}</strong>.
+                </p>
+                <div className="p-2 bg-white/80 rounded border border-red-100 text-[11px] font-mono text-red-800">
+                  Consignee: {purgingOrder.customerName} ({purgingOrder.customerEmail})<br />
+                  Est. Value: ${purgingOrder.totalEstimatedValue?.toLocaleString()} USD
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPurgingOrder(null)}
+                  className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmPermanentPurge}
+                  className="flex-1 py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Permanently Purge
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: TIER 2 PERMANENT PURGE SAFEGUARD (Bulk) */}
+        {isPurgingBulk && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                    <AlertOctagon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-red-950 text-base leading-tight">
+                      Bulk Permanent Purge ({selectedOrderIds.length})
+                    </h3>
+                    <span className="text-[10px] text-red-600 font-mono font-bold uppercase">Irreversible Removal</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPurgingBulk(false)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-red-900 text-xs leading-relaxed space-y-2">
+                <p>
+                  You are about to permanently purge <strong>{selectedOrderIds.length} selected orders</strong> from the repository.
+                </p>
+                <p className="text-[11px] text-red-700 font-semibold">
+                  This action is irreversible and purges all transaction logs, financial records, and tracking logs forever.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPurgingBulk(false)}
+                  className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBulkPurge}
+                  className="flex-1 py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Purge {selectedOrderIds.length} Orders
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: TIER 2 EMPTY TRASH SAFEGUARD */}
+        {isEmptyingTrash && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn font-body">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                    <AlertOctagon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold text-red-950 text-base leading-tight">
+                      Empty Trash Archive
+                    </h3>
+                    <span className="text-[10px] text-red-600 font-mono font-bold uppercase">{trashOrdersCount} records will be purged</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsEmptyingTrash(false)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-red-900 text-xs leading-relaxed space-y-2">
+                <p>
+                  Are you sure you want to permanently empty the trash bin? All <strong>{trashOrdersCount} archived consignments</strong> will be destroyed.
+                </p>
+                <p className="text-[11px] text-red-700 font-semibold">
+                  This action is irreversible and purges all transaction logs.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEmptyingTrash(false)}
+                  className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmEmptyTrash}
+                  className="flex-1 py-2 px-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Empty Entire Trash
                 </button>
               </div>
             </div>
@@ -2253,7 +2792,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                 Category
@@ -2295,7 +2834,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
 
             <div>
               <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                Indicative Price per MT/Unit
+                Indicative Price Display
               </label>
               <input
                 type="text"
@@ -2304,6 +2843,29 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
                 placeholder="e.g. $1,150 / MT CIF"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
               />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                Unit Price (USD) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={formData.unitPriceNumeric !== undefined ? formData.unitPriceNumeric : ''}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  setFormData({ 
+                    ...formData, 
+                    unitPriceNumeric: val,
+                    indicativePrice: formData.indicativePrice || `$${val.toLocaleString()} / MT CIF`
+                  });
+                }}
+                placeholder="e.g. 1150"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900"
+              />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Used for quote math</span>
             </div>
           </div>
 
@@ -2377,7 +2939,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
           </div>
 
           {/* Specifications Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Origin</label>
               <input
@@ -2397,13 +2959,29 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">MOQ</label>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">MOQ Display</label>
               <input
                 type="text"
                 value={formData.moq}
                 onChange={(e) => setFormData({ ...formData, moq: e.target.value })}
+                placeholder="e.g. 20 MT"
                 className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs"
               />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                MOQ Numeric (Min) *
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                value={formData.moqNumeric !== undefined ? formData.moqNumeric : ''}
+                onChange={(e) => setFormData({ ...formData, moqNumeric: parseFloat(e.target.value) || 0 })}
+                placeholder="e.g. 20"
+                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-mono font-bold text-slate-900"
+              />
+              <span className="text-[9px] text-slate-400 block mt-0.5">Enforces order gate</span>
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Loadability</label>

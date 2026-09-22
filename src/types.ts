@@ -30,6 +30,8 @@ export interface ProductItem {
   isDelisted?: boolean;
   priceMode?: 'rfq_only' | 'indicative';
   indicativePrice?: string; // e.g. "$1,150 / MT CIF"
+  unitPriceNumeric?: number; // Numeric indicative price (USD)
+  moqNumeric?: number; // Minimum Order Quantity numeric threshold (e.g. 1 container or 20 MT)
 }
 
 export type UserRole = 'admin' | 'customer';
@@ -73,6 +75,8 @@ export interface BankingSettings {
   branchName?: string;
   swiftBic?: string;
   payoutNotes?: string;
+  isGatewayActive: boolean; // Active Commercial Operations vs Temporarily Suspend Transactions
+  suspensionNotice?: string; // Corporate statutory notice
   updatedAt: string;
 }
 
@@ -112,6 +116,9 @@ export interface OrderRecord {
   cancelledAt?: string;
   clientNotes?: string;
   adminNotes?: string;
+  isDeleted?: boolean; // Tier 1: Soft Delete to Trash Bin / Archive
+  deletedAt?: string;
+  deletedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProductItem } from '../types';
-import { X, Check, ShieldCheck, Anchor, Package, Calendar, Award, Sparkles, Send } from 'lucide-react';
+import { X, Check, ShieldCheck, Anchor, Package, Calendar, Award, Sparkles, Send, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface ProductModalProps {
@@ -18,10 +18,34 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [quantity, setQuantity] = useState<number>(1);
   const [unit, setUnit] = useState<'MT' | 'Containers (20ft)' | 'Containers (40ft)' | 'Sample Box (5kg)'>('Containers (40ft)');
   const [sampleSuccess, setSampleSuccess] = useState(false);
+  const [moqWarning, setMoqWarning] = useState<string | null>(null);
 
   if (!product) return null;
 
+  // MOQ validation helper
+  const isBelowMoq = (qty: number, selectedUnit: string) => {
+    if (selectedUnit === 'Sample Box (5kg)') return false; // Sample exception
+    if (selectedUnit === 'MT') {
+      const minMt = product.moqNumeric || 10;
+      return qty < minMt;
+    }
+    if (selectedUnit.includes('Containers')) {
+      const minContainers = 1;
+      return qty < minContainers;
+    }
+    return false;
+  };
+
   const handleAddAndClose = () => {
+    if (isBelowMoq(quantity, unit)) {
+      const minMsg = unit === 'MT' 
+        ? `Minimum Order Quantity constraint: Minimum ${product.moqNumeric || 10} MT required for ${product.name}.`
+        : `Minimum Order Quantity constraint: Minimum 1 container required.`;
+      setMoqWarning(minMsg);
+      return;
+    }
+    setMoqWarning(null);
+
     onAddToCart(product, quantity, unit, selectedPackaging || product.packagingOptions[0]);
     confetti({
       particleCount: 40,
@@ -113,6 +137,21 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     Botanical: {product.scientificName}
                   </p>
                 )}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {product.indicativePrice && (
+                    <span className="px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-300 text-xs font-mono font-bold">
+                      Trade Price: {product.indicativePrice}
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 rounded bg-blue-50 text-blue-900 border border-blue-200 text-xs font-semibold">
+                    MOQ: {product.moq}
+                  </span>
+                  {product.sku && (
+                    <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-mono">
+                      SKU: {product.sku}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <p className="text-gray-600 text-xs sm:text-sm leading-relaxed font-body">
@@ -202,6 +241,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   </span>
                 ))}
               </div>
+
+              {/* MOQ Storefront Policy Notice */}
+              {moqWarning && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center gap-2 animate-fadeIn">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span className="font-medium">{moqWarning}</span>
+                </div>
+              )}
             </div>
 
             {/* Quantity Selector & Action Button */}

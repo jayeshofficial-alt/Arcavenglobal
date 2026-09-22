@@ -122,7 +122,7 @@ export const Footer: React.FC<FooterProps> = ({
                     onClick={isAdminLoggedIn && onOpenAdminPanel ? onOpenAdminPanel : onOpenAdminLogin}
                     className="hover:text-amber-400 transition-colors text-left flex items-center gap-1.5 cursor-pointer text-amber-400/90 font-medium"
                   >
-                    <span>Admin Gate (jayeshofficial@gmail.com)</span>
+                    <span>Executive Admin Gate</span>
                   </button>
                 </li>
               )}

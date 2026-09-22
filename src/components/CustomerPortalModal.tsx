@@ -71,10 +71,12 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
-  // Filter orders belonging to this customer (or match by email or customerId)
+  // Filter active orders belonging to this customer (exclude soft-deleted trash records)
   const myOrders = orders.filter(ord => 
-    ord.customerId === currentUser.id || 
-    ord.customerEmail.toLowerCase() === currentUser.email.toLowerCase()
+    !ord.isDeleted && (
+      ord.customerId === currentUser.id || 
+      ord.customerEmail.toLowerCase() === currentUser.email.toLowerCase()
+    )
   );
 
   const handleUpdateProfile = (e: React.FormEvent) => {

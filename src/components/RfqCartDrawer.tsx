@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { RfqItem, OrderRecord } from '../types';
-import { X, Trash2, ShoppingBag, Send, CheckCircle2, Globe, Mail, ExternalLink, MessageCircle, CreditCard } from 'lucide-react';
+import { RfqItem, OrderRecord, BankingSettings } from '../types';
+import { X, Trash2, ShoppingBag, Send, CheckCircle2, Globe, Mail, ExternalLink, MessageCircle, CreditCard, AlertTriangle, Lock, ShieldAlert } from 'lucide-react';
 import { sendRfqCartEmail, TARGET_INQUIRY_EMAIL } from '../utils/emailService';
-import { createOrderFromRfq } from '../utils/storage';
+import { createOrderFromRfq, getStoredBankingSettings } from '../utils/storage';
 import confetti from 'canvas-confetti';
 
 interface RfqCartDrawerProps {
@@ -14,6 +14,7 @@ interface RfqCartDrawerProps {
   onClearCart: () => void;
   onOrderCreated?: (order: OrderRecord) => void;
   onOpenPaymentModal?: (order: OrderRecord) => void;
+  bankingSettings?: BankingSettings;
 }
 
 export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
@@ -24,7 +25,8 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
   onRemoveItem,
   onClearCart,
   onOrderCreated,
-  onOpenPaymentModal
+  onOpenPaymentModal,
+  bankingSettings
 }) => {
   const [incoterm, setIncoterm] = useState('CIF');
   const [destinationPort, setDestinationPort] = useState('');
@@ -38,12 +40,27 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
   const [createdOrder, setCreatedOrder] = useState<OrderRecord | null>(null);
   const [mailtoLink, setMailtoLink] = useState('');
   const [whatsappLink, setWhatsappLink] = useState('');
+  const [moqError, setMoqError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const activeBanking = bankingSettings || getStoredBankingSettings();
 
   const handleSubmitQuote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!buyerName || !buyerEmail) return;
+
+    // Storefront MOQ Validation check
+    const invalidMoqItem = items.find(
+      (it) => it.unit === 'MT' && it.product.moqNumeric && it.quantity < it.product.moqNumeric
+    );
+    if (invalidMoqItem) {
+      setMoqError(
+        `Storefront MOQ constraint: "${invalidMoqItem.product.name}" requires minimum ${invalidMoqItem.product.moqNumeric} MT. Please update the quantity before proceeding.`
+      );
+      return;
+    }
+    setMoqError(null);
 
     setIsSubmitting(true);
     try {
@@ -181,7 +198,7 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
                 </p>
               </div>
 
-              {/* Instant Payment Trigger */}
+              {/* Instant Payment Trigger or Statutory Maintenance Notice */}
               {createdOrder && onOpenPaymentModal && (
                 <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-left space-y-2">
                   <div className="flex items-center justify-between">
@@ -192,19 +209,34 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
                       ${(createdOrder.totalEstimatedValue || 0).toLocaleString()} USD
                     </span>
                   </div>
-                  <p className="text-[11px] text-emerald-800 leading-relaxed">
-                    You can settle or deposit against this proforma invoice right away via Cards, Net Banking, or UPI QR code.
-                  </p>
-                  <button
-                    onClick={() => {
-                      onOpenPaymentModal(createdOrder);
-                      handleFinishAndClear();
-                    }}
-                    className="w-full py-2.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Proceed to Digital Checkout</span>
-                  </button>
+
+                  {activeBanking.isGatewayActive === false ? (
+                    <div className="p-3.5 bg-amber-50 rounded-lg border border-amber-300 text-amber-950 space-y-1.5 mt-2">
+                      <div className="flex items-center gap-1.5 text-xs font-heading font-bold uppercase tracking-wider text-amber-900">
+                        <Lock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        <span>Corporate Notice: Gateway Suspended</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 leading-relaxed font-body">
+                        {activeBanking.suspensionNotice || "Corporate Notice: Our transactional portal is currently undergoing scheduled platform maintenance while Arca Ventures Global completes statutory legal compliance and international import documentation. Commercial onboarding will resume shortly. For priority inquiries, please contact our administrative desk directly."}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        You can settle or deposit against this proforma invoice right away via Cards, Net Banking, or UPI QR code.
+                      </p>
+                      <button
+                        onClick={() => {
+                          onOpenPaymentModal(createdOrder);
+                          handleFinishAndClear();
+                        }}
+                        className="w-full py-2.5 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>Proceed to Digital Checkout</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -281,6 +313,14 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
                       <div className="text-[11px] text-slate-600 font-mono">
                         Packaging: {item.packagingType || 'Standard Export'}
                       </div>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 pt-0.5">
+                        <span>MOQ: {item.product.moq}</span>
+                        {item.unit === 'MT' && item.product.moqNumeric && item.quantity < item.product.moqNumeric && (
+                          <span className="text-amber-800 bg-amber-100 font-bold px-1.5 py-0.5 rounded">
+                            Below MOQ ({item.product.moqNumeric} MT)
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 pt-1">
                         <span className="text-[10px] font-heading uppercase text-slate-400 font-bold">Qty:</span>
                         <input
@@ -304,6 +344,13 @@ export const RfqCartDrawer: React.FC<RfqCartDrawerProps> = ({
                   </div>
                 ))}
               </div>
+
+              {moqError && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center gap-2 animate-fadeIn">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span className="font-medium">{moqError}</span>
+                </div>
+              )}
 
               {/* Form */}
               <form onSubmit={handleSubmitQuote} className="space-y-3.5 pt-2 border-t border-slate-100">

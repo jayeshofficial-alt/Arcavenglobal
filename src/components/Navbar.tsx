@@ -205,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     id="nav-admin-console-btn"
                     onClick={onOpenAdminPanel}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#001233] text-amber-400 text-xs font-semibold border border-amber-400/50 shadow-xs hover:bg-slate-900 transition-colors cursor-pointer"
-                    title="Admin Console (jayeshofficial@gmail.com)"
+                    title="Super Admin Workspace"
                   >
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                     <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
@@ -216,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     id="nav-admin-login-btn"
                     onClick={onOpenAdminLogin}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-200/80 transition-colors cursor-pointer"
-                    title="Executive Admin (jayeshofficial@gmail.com)"
+                    title="Executive Admin Workspace Gate"
                   >
                     <Lock className="w-3 h-3 text-amber-600" />
                     <span>Admin</span>
@@ -373,7 +373,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-amber-400" />
-                      <span>Admin Console (jayeshofficial@gmail.com)</span>
+                      <span>Admin Command Center</span>
                     </div>
                     <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">Root</span>
                   </button>
@@ -386,7 +386,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold border border-amber-200/80 transition-colors"
                   >
                     <Lock className="w-4 h-4 text-amber-600" />
-                    <span>Admin Gate (jayeshofficial@gmail.com)</span>
+                    <span>Admin Workspace Gate</span>
                   </button>
                 )}
 

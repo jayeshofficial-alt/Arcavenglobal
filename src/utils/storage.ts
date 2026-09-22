@@ -33,6 +33,8 @@ export const DEFAULT_BANKING_SETTINGS: BankingSettings = {
   branchName: 'Nariman Point Corporate Commercial, Mumbai',
   swiftBic: 'SBININBBXXX',
   payoutNotes: 'Official Arca Ventures Global escrow & commercial trade settlement account.',
+  isGatewayActive: true,
+  suspensionNotice: 'Corporate Notice: Our transactional portal is currently undergoing scheduled platform maintenance while Arca Ventures Global completes statutory legal compliance and international import documentation. Commercial onboarding will resume shortly. For priority inquiries, please contact our administrative desk directly.',
   updatedAt: '2026-01-15T00:00:00.000Z'
 };
 
@@ -354,11 +356,16 @@ function ensureProductDefaults(items: ProductItem[]): ProductItem[] {
       else if (prod.category === 'specialty-spices') sku = `AVG-SPI-${(idx + 1).toString().padStart(3, '0')}`;
       else sku = `AVG-COI-${(idx + 1).toString().padStart(3, '0')}`;
     }
+    const defaultMoqNum = prod.category === 'vegetables-fruits' ? 10 : (prod.category === 'grains-pulses' ? 20 : 1);
+    const defaultPriceNum = prod.category === 'specialty-spices' ? 4500 : (prod.category === 'coconut-products' ? 14500 : (prod.category === 'grains-pulses' ? 1150 : 850));
+
     return {
       ...prod,
       sku,
       priceMode: prod.priceMode || 'indicative',
-      indicativePrice: prod.indicativePrice || (prod.category === 'grains-pulses' ? '$1,150 / MT' : '$950 / MT')
+      indicativePrice: prod.indicativePrice || (prod.category === 'grains-pulses' ? '$1,150 / MT' : '$950 / MT'),
+      unitPriceNumeric: prod.unitPriceNumeric !== undefined ? prod.unitPriceNumeric : defaultPriceNum,
+      moqNumeric: prod.moqNumeric !== undefined ? prod.moqNumeric : defaultMoqNum
     };
   });
 }
@@ -788,6 +795,8 @@ export function createOrderFromRfq(data: {
     currency: 'USD',
     status: 'Order Received',
     paymentStatus: 'Pending',
+    isDeleted: false,
+    adminNotes: `Instant transaction confirmation generated and forwarded to customer (${data.customerEmail}) and Super Admin desk (jayeshofficial.com).`,
     clientNotes: data.clientNotes,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -866,12 +875,116 @@ export function cancelOrder(orderId: string, cancellationReason: string, adminNo
   });
 }
 
-export function deleteOrder(orderId: string): boolean {
+// TIER 1: Soft Delete (Moves to Trash Bin / Archive)
+export function softDeleteOrder(orderId: string, adminUser = 'Super Admin'): OrderRecord {
+  const orders = getStoredOrders();
+  let updatedOrder: OrderRecord | null = null;
+  const newOrders = orders.map(ord => {
+    if (ord.id === orderId) {
+      const updated: OrderRecord = {
+        ...ord,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+        deletedBy: adminUser,
+        updatedAt: new Date().toISOString()
+      };
+      updatedOrder = updated;
+      return updated;
+    }
+    return ord;
+  });
+  saveOrders(newOrders);
+  if (!updatedOrder) throw new Error('Order record not found.');
+  return updatedOrder;
+}
+
+export function softDeleteOrdersBulk(orderIds: string[], adminUser = 'Super Admin'): OrderRecord[] {
+  const orders = getStoredOrders();
+  const idSet = new Set(orderIds);
+  const now = new Date().toISOString();
+  const newOrders = orders.map(ord => {
+    if (idSet.has(ord.id)) {
+      return {
+        ...ord,
+        isDeleted: true,
+        deletedAt: now,
+        deletedBy: adminUser,
+        updatedAt: now
+      };
+    }
+    return ord;
+  });
+  saveOrders(newOrders);
+  return newOrders;
+}
+
+// RESTORE: Moves order out of Trash Bin back into the active pipeline
+export function restoreOrder(orderId: string): OrderRecord {
+  const orders = getStoredOrders();
+  let updatedOrder: OrderRecord | null = null;
+  const newOrders = orders.map(ord => {
+    if (ord.id === orderId) {
+      const updated: OrderRecord = {
+        ...ord,
+        isDeleted: false,
+        deletedAt: undefined,
+        deletedBy: undefined,
+        updatedAt: new Date().toISOString()
+      };
+      updatedOrder = updated;
+      return updated;
+    }
+    return ord;
+  });
+  saveOrders(newOrders);
+  if (!updatedOrder) throw new Error('Order record not found.');
+  return updatedOrder;
+}
+
+export function restoreOrdersBulk(orderIds: string[]): OrderRecord[] {
+  const orders = getStoredOrders();
+  const idSet = new Set(orderIds);
+  const now = new Date().toISOString();
+  const newOrders = orders.map(ord => {
+    if (idSet.has(ord.id)) {
+      return {
+        ...ord,
+        isDeleted: false,
+        deletedAt: undefined,
+        deletedBy: undefined,
+        updatedAt: now
+      };
+    }
+    return ord;
+  });
+  saveOrders(newOrders);
+  return newOrders;
+}
+
+// TIER 2: Permanent Purge (Irreversible removal of transaction logs)
+export function permanentlyPurgeOrder(orderId: string): boolean {
   const orders = getStoredOrders();
   const filtered = orders.filter(ord => ord.id !== orderId);
   saveOrders(filtered);
   return true;
 }
+
+export function permanentlyPurgeOrdersBulk(orderIds: string[]): boolean {
+  const orders = getStoredOrders();
+  const idSet = new Set(orderIds);
+  const filtered = orders.filter(ord => !idSet.has(ord.id));
+  saveOrders(filtered);
+  return true;
+}
+
+export function emptyTrashOrders(): boolean {
+  const orders = getStoredOrders();
+  const activeOnly = orders.filter(ord => !ord.isDeleted);
+  saveOrders(activeOnly);
+  return true;
+}
+
+export const deleteOrder = permanentlyPurgeOrder;
 
 export function recordOrderPayment(
   orderId: string,
