@@ -22,7 +22,7 @@ import { AdminPanelModal } from './components/AdminPanelModal';
 import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { CustomerPortalModal } from './components/CustomerPortalModal';
 import { PaymentModal } from './components/PaymentModal';
-import { ProductItem, RfqItem, UserAccount, OrderRecord, SiteContent } from './types';
+import { ProductItem, RfqItem, UserAccount, OrderRecord, SiteContent, BankingSettings } from './types';
 import {
   getStoredProducts,
   saveProducts,
@@ -30,6 +30,8 @@ import {
   saveOrders,
   getStoredSiteContent,
   saveSiteContent,
+  getStoredBankingSettings,
+  saveBankingSettings,
   getCurrentSession,
   setCurrentSession,
   clearCurrentSession,
@@ -47,6 +49,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentSession());
   const [orders, setOrders] = useState<OrderRecord[]>(() => getStoredOrders());
   const [siteContent, setSiteContent] = useState<SiteContent>(() => getStoredSiteContent());
+  const [bankingSettings, setBankingSettings] = useState<BankingSettings>(() => getStoredBankingSettings());
 
   // Modal Visibilities
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
@@ -116,6 +119,10 @@ export default function App() {
     const updated = orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o));
     setOrders(updated);
     saveOrders(updated);
+  };
+
+  const handleBankingSettingsUpdated = (updated: BankingSettings) => {
+    setBankingSettings(updated);
   };
 
   // Add to Quote Basket
@@ -269,7 +276,7 @@ export default function App() {
         onLoginSuccess={handleAdminLoginSuccess}
       />
 
-      {/* Full Admin Panel Modal (5 Tabs: Orders, Products CRUD & Delist, Content, Customers, Security) */}
+      {/* Full Admin Panel Modal (6 Tabs: Orders, Products CRUD & Delist, Content, Customers, Banking Gateway, Security) */}
       <AdminPanelModal
         isOpen={isAdminPanelOpen}
         onClose={() => setIsAdminPanelOpen(false)}
@@ -280,6 +287,8 @@ export default function App() {
         onSiteContentUpdated={handleSiteContentUpdated}
         orders={orders}
         onOrdersUpdated={handleOrdersUpdated}
+        bankingSettings={bankingSettings}
+        onBankingSettingsUpdated={handleBankingSettingsUpdated}
         onLogout={handleLogout}
       />
 
@@ -307,6 +316,7 @@ export default function App() {
         onClose={() => setIsPaymentOpen(false)}
         order={activePaymentOrder}
         onPaymentSuccess={handlePaymentSuccess}
+        bankingSettings={bankingSettings}
       />
     </div>
   );

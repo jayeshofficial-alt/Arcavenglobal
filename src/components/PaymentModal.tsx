@@ -12,23 +12,29 @@ import {
   ArrowRight,
   RefreshCw,
   Smartphone,
-  Receipt
+  Receipt,
+  ExternalLink,
+  Check,
+  Building
 } from 'lucide-react';
-import { OrderRecord, PaymentMethod } from '../types';
+import { OrderRecord, PaymentMethod, BankingSettings } from '../types';
+import { getStoredBankingSettings, recordOrderPayment } from '../utils/storage';
 import confetti from 'canvas-confetti';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: OrderRecord | null;
-  onPaymentSuccess: (orderId: string, method: PaymentMethod, referenceNumber: string) => void;
+  onPaymentSuccess: (updatedOrder: OrderRecord) => void;
+  bankingSettings?: BankingSettings;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
   order,
-  onPaymentSuccess
+  onPaymentSuccess,
+  bankingSettings: propBankingSettings
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('UPI');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -38,6 +44,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     timestamp: string;
   } | null>(null);
 
+  // Copy state feedbacks
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [copiedAccount, setCopiedAccount] = useState(false);
+  const [copiedIfsc, setCopiedIfsc] = useState(false);
+
   // Credit/Debit form
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
@@ -45,16 +56,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [cardCvv, setCardCvv] = useState('');
 
   // Net banking
-  const [selectedBank, setSelectedBank] = useState('HDFC Bank');
+  const [selectedBank, setSelectedBank] = useState('State Bank of India');
 
-  // UPI
+  // UPI VPA input
   const [vpa, setVpa] = useState('');
   const [isVpaVerified, setIsVpaVerified] = useState(false);
 
   if (!isOpen || !order) return null;
 
+  // Resolve active banking settings (from props or local storage)
+  const activeBanking = propBankingSettings || getStoredBankingSettings();
+
   const totalAmount = order.totalEstimatedValue || 15000;
   const inrEquivalent = Math.round(totalAmount * 84);
+
+  // Dynamic UPI Intent URL based on current admin settings
+  const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(activeBanking.upiId)}&pn=${encodeURIComponent(activeBanking.accountHolderName)}&am=${inrEquivalent}&cu=INR&tn=${encodeURIComponent(`Order ${order.orderNumber}`)}`;
+
+  // Dynamic QR Code URL generated for this exact order & active UPI ID
+  const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(upiIntentUrl)}`;
 
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -64,11 +84,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     for (let i = 0, len = match.length; i < len; i += 4) {
       parts.push(match.substring(i, i + 4));
     }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return value;
-    }
+    return parts.length ? parts.join(' ') : value;
+  };
+
+  const handleCopy = (text: string, type: 'upi' | 'acc' | 'ifsc') => {
+    navigator.clipboard.writeText(text).then(() => {
+      if (type === 'upi') {
+        setCopiedUpi(true);
+        setTimeout(() => setCopiedUpi(false), 2000);
+      } else if (type === 'acc') {
+        setCopiedAccount(true);
+        setTimeout(() => setCopiedAccount(false), 2000);
+      } else {
+        setCopiedIfsc(true);
+        setTimeout(() => setCopiedIfsc(false), 2000);
+      }
+    });
   };
 
   const handleProcessPayment = (e: React.FormEvent) => {
@@ -95,7 +126,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       };
 
       setCompletedTxn(txnData);
-      onPaymentSuccess(order.id, selectedMethod, ref);
+
+      // Record in storage and trigger notification callback
+      try {
+        const updated = recordOrderPayment(order.id, selectedMethod, ref);
+        onPaymentSuccess(updated);
+      } catch (err) {
+        console.error('Failed to record payment in storage:', err);
+      }
 
       try {
         confetti({
@@ -107,10 +145,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         // ignore
       }
     }, 1200);
-  };
-
-  const handleCopyRef = (text: string) => {
-    navigator.clipboard.writeText(text);
   };
 
   return (
@@ -128,14 +162,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-heading text-lg font-bold text-white">
-                  Commercial Invoice Payment
+                  Commercial Invoice Checkout
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
                   {order.orderNumber}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Multi-method digital settlement gateway for Arca Ventures Global
+                Official payment receiver: <strong className="text-slate-200">{activeBanking.accountHolderName}</strong> ({activeBanking.upiId})
               </p>
             </div>
           </div>
@@ -150,10 +184,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-grow">
+        <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-grow bg-slate-50">
           {completedTxn ? (
             /* Success Receipt Screen */
-            <div className="space-y-5 text-center py-4">
+            <div className="space-y-5 text-center py-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
@@ -166,7 +200,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   Settlement Confirmed
                 </h2>
                 <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                  Transaction reference has been generated and automatically updated in the Super Admin Order Queue for verification and dispatch scheduling.
+                  Transaction reference has been generated and automatically recorded to the Super Admin Command Center queue for verification and dispatch scheduling.
                 </p>
               </div>
 
@@ -177,7 +211,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   <span className="font-mono font-bold text-slate-800">{order.orderNumber}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                  <span className="text-slate-500">Payment Method:</span>
+                  <span className="text-slate-500">Beneficiary:</span>
+                  <span className="font-semibold text-slate-800">{activeBanking.accountHolderName}</span>
+                </div>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="text-slate-500">Settlement Method:</span>
                   <span className="font-semibold text-slate-800">{completedTxn.method}</span>
                 </div>
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -192,7 +230,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <span className="font-mono font-bold text-slate-900 text-sm select-all">{completedTxn.reference}</span>
                   </div>
                   <button
-                    onClick={() => handleCopyRef(completedTxn.reference)}
+                    onClick={() => navigator.clipboard.writeText(completedTxn.reference)}
                     className="p-1.5 hover:bg-slate-200 rounded text-slate-600 cursor-pointer"
                     title="Copy Reference"
                   >
@@ -201,68 +239,61 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-center gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   onClick={onClose}
-                  className="py-2.5 px-6 bg-[#0B192C] hover:bg-slate-900 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors shadow-md cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#0B192C] hover:bg-slate-900 text-white text-xs font-heading font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
                 >
                   Return to Dashboard
                 </button>
               </div>
             </div>
           ) : (
-            /* Active Payment Form */
+            /* Main Checkout Flow */
             <div className="space-y-5">
-              {/* Order Amount Banner */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-slate-500 block">
-                    Total Export Value
+              {/* Order Summary Ribbon */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-slate-400">
+                    Total Proforma Valuation
                   </span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold font-mono text-[#0B192C]">
-                      ${totalAmount.toLocaleString()} <span className="text-xs font-sans text-slate-500 font-normal">USD</span>
+                    <span className="font-heading text-2xl font-bold text-slate-900">
+                      ${totalAmount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">USD</span>
                     </span>
-                    <span className="text-xs text-slate-400 font-mono">
-                      (Approx ₹{inrEquivalent.toLocaleString()})
+                    <span className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      ~₹{inrEquivalent.toLocaleString()} INR
                     </span>
                   </div>
                 </div>
 
-                <div className="text-left sm:text-right text-xs text-slate-500 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                  <div className="font-medium text-slate-800">
-                    {order.customerName} ({order.company || 'Consignee'})
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Discharge Port: {order.destinationPort || 'Standard Port'} • {order.incoterm}
-                  </div>
+                <div className="text-right text-xs">
+                  <span className="text-slate-500 block text-[11px]">Consignee: {order.customerName}</span>
+                  <span className="text-slate-400 text-[10px] block font-mono">Port: {order.destinationPort || 'Standard Dispatch'}</span>
                 </div>
               </div>
 
-              {/* Payment Method Selector Tabs */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-2 font-heading uppercase tracking-wider">
-                  Select Digital Payment Gateway
+              {/* Payment Method Tabs */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-700 font-heading uppercase tracking-wider">
+                  Select Settlement Method
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setSelectedMethod('UPI')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                       selectedMethod === 'UPI'
-                        ? 'border-emerald-600 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-600'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-1 ring-amber-500'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <QrCode className={`w-5 h-5 ${selectedMethod === 'UPI' ? 'text-emerald-700' : 'text-slate-500'}`} />
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-mono">
-                        Instant
-                      </span>
-                    </div>
+                    <QrCode className={`w-5 h-5 mb-1 ${selectedMethod === 'UPI' ? 'text-amber-600' : 'text-slate-500'}`} />
                     <span className="font-heading text-xs font-bold text-slate-900 block">
                       UPI QR & VPA
                     </span>
+                    <span className="text-[10px] text-amber-700 font-mono">Instant QR</span>
                   </button>
 
                   <button
@@ -270,14 +301,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     onClick={() => setSelectedMethod('Credit Card')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                       selectedMethod === 'Credit Card'
-                        ? 'border-emerald-600 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-600'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-1 ring-amber-500'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
                   >
-                    <CreditCard className={`w-5 h-5 mb-1 ${selectedMethod === 'Credit Card' ? 'text-emerald-700' : 'text-slate-500'}`} />
+                    <CreditCard className={`w-5 h-5 mb-1 ${selectedMethod === 'Credit Card' ? 'text-amber-600' : 'text-slate-500'}`} />
                     <span className="font-heading text-xs font-bold text-slate-900 block">
                       Credit Card
                     </span>
+                    <span className="text-[10px] text-slate-400">Visa/Mastercard</span>
                   </button>
 
                   <button
@@ -285,14 +317,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     onClick={() => setSelectedMethod('Debit Card')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                       selectedMethod === 'Debit Card'
-                        ? 'border-emerald-600 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-600'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-1 ring-amber-500'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
                   >
-                    <CreditCard className={`w-5 h-5 mb-1 ${selectedMethod === 'Debit Card' ? 'text-emerald-700' : 'text-slate-500'}`} />
+                    <CreditCard className={`w-5 h-5 mb-1 ${selectedMethod === 'Debit Card' ? 'text-amber-600' : 'text-slate-500'}`} />
                     <span className="font-heading text-xs font-bold text-slate-900 block">
                       Debit Card
                     </span>
+                    <span className="text-[10px] text-slate-400">RuPay/All Banks</span>
                   </button>
 
                   <button
@@ -300,73 +333,89 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     onClick={() => setSelectedMethod('Net Banking')}
                     className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                       selectedMethod === 'Net Banking'
-                        ? 'border-emerald-600 bg-emerald-50/60 shadow-xs ring-1 ring-emerald-600'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-amber-500 bg-amber-50/70 shadow-xs ring-1 ring-amber-500'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
                   >
-                    <Building2 className={`w-5 h-5 mb-1 ${selectedMethod === 'Net Banking' ? 'text-emerald-700' : 'text-slate-500'}`} />
+                    <Building2 className={`w-5 h-5 mb-1 ${selectedMethod === 'Net Banking' ? 'text-amber-600' : 'text-slate-500'}`} />
                     <span className="font-heading text-xs font-bold text-slate-900 block">
                       Net Banking
                     </span>
+                    <span className="text-[10px] text-slate-400">Direct Wire/RTGS</span>
                   </button>
                 </div>
               </div>
 
               {/* Form Content by Method */}
               <form onSubmit={handleProcessPayment} className="space-y-4">
-                {/* 1. UPI QR & VPA */}
+                
+                {/* 1. UPI QR & VPA (Dynamic according to admin settings) */}
                 {selectedMethod === 'UPI' && (
-                  <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="flex flex-col sm:flex-row items-center gap-5">
-                      {/* Dynamic QR Box */}
-                      <div className="p-3 bg-white rounded-xl border border-slate-300 shadow-sm flex flex-col items-center flex-shrink-0">
-                        <div className="w-36 h-36 bg-slate-900 p-2 rounded-lg flex items-center justify-center relative overflow-hidden">
-                          {/* SVG QR Code pattern */}
-                          <svg className="w-full h-full text-white" viewBox="0 0 100 100" fill="currentColor">
-                            <rect width="100" height="100" fill="#0B192C"/>
-                            {/* Corner squares */}
-                            <rect x="10" y="10" width="25" height="25" fill="#FFFFFF"/>
-                            <rect x="15" y="15" width="15" height="15" fill="#0B192C"/>
-                            <rect x="18" y="18" width="9" height="9" fill="#F59E0B"/>
-
-                            <rect x="65" y="10" width="25" height="25" fill="#FFFFFF"/>
-                            <rect x="70" y="15" width="15" height="15" fill="#0B192C"/>
-                            <rect x="73" y="18" width="9" height="9" fill="#F59E0B"/>
-
-                            <rect x="10" y="65" width="25" height="25" fill="#FFFFFF"/>
-                            <rect x="15" y="70" width="15" height="15" fill="#0B192C"/>
-                            <rect x="18" y="73" width="9" height="9" fill="#F59E0B"/>
-
-                            {/* Center and dots */}
-                            <circle cx="50" cy="50" r="10" fill="#10B981" />
-                            <rect x="42" y="15" width="6" height="6" fill="#FFFFFF"/>
-                            <rect x="52" y="25" width="6" height="6" fill="#FFFFFF"/>
-                            <rect x="45" y="70" width="8" height="8" fill="#FFFFFF"/>
-                            <rect x="65" y="45" width="7" height="7" fill="#FFFFFF"/>
-                            <rect x="75" y="65" width="10" height="10" fill="#FFFFFF"/>
-                            <rect x="40" y="40" width="5" height="5" fill="#FFFFFF"/>
-                          </svg>
+                  <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      
+                      {/* Live Generated QR Code Box */}
+                      <div className="p-3 bg-white rounded-xl border-2 border-slate-300 shadow-md flex flex-col items-center flex-shrink-0">
+                        <div className="w-40 h-40 bg-white p-1 rounded-lg flex items-center justify-center relative overflow-hidden">
+                          <img 
+                            src={qrCodeImageUrl} 
+                            alt={`UPI QR Code for ${activeBanking.upiId}`}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              // If network image fails, fallback to inline SVG visual QR
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
                         </div>
                         <span className="text-[10px] text-slate-500 font-mono mt-1.5 flex items-center gap-1">
                           <Smartphone className="w-3 h-3 text-emerald-600" />
-                          <span>Scan with any UPI App</span>
+                          <span>Scan with GPay / PhonePe / Paytm</span>
                         </span>
                       </div>
 
-                      {/* Instructions & VPA input */}
-                      <div className="space-y-3 flex-grow text-xs">
-                        <div>
-                          <span className="font-bold text-slate-900 block text-sm">
-                            UPI Merchant: Arca Ventures Global
+                      {/* Dynamic Receiver Info & Intent Controls */}
+                      <div className="space-y-3.5 flex-grow text-xs w-full">
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                          <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-slate-400 block">
+                            Configured Payout Receiver
                           </span>
-                          <span className="text-slate-500 font-mono text-[11px] block">
-                            VPA: arcavenglobal@icici
-                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-heading font-bold text-slate-900 text-sm">
+                              {activeBanking.accountHolderName}
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                              Verified Merchant
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <div className="font-mono text-xs text-amber-700 font-bold">
+                              UPI ID: {activeBanking.upiId}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(activeBanking.upiId, 'upi')}
+                              className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              {copiedUpi ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
                         </div>
 
+                        {/* Direct Mobile UPI Intent Link Button */}
+                        <a
+                          href={upiIntentUrl}
+                          className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-heading text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Open UPI App Directly (₹{inrEquivalent.toLocaleString()})</span>
+                        </a>
+
+                        {/* Customer VPA Input */}
                         <div>
                           <label className="block text-[11px] font-semibold text-slate-700 mb-1 font-heading uppercase">
-                            Or Enter Your UPI ID (VPA)
+                            Or Enter Your Personal UPI ID
                           </label>
                           <div className="flex gap-2">
                             <input
@@ -376,8 +425,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 setVpa(e.target.value);
                                 setIsVpaVerified(false);
                               }}
-                              placeholder="e.g. buyer@okaxis or company@icici"
-                              className="flex-grow px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
+                              placeholder="e.g. buyer@oksbi or company@icici"
+                              className="flex-grow px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
                             />
                             <button
                               type="button"
@@ -388,13 +437,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                               }}
                               className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                             >
-                              {isVpaVerified ? 'Verified ✓' : 'Verify VPA'}
+                              {isVpaVerified ? 'Verified ✓' : 'Verify'}
                             </button>
                           </div>
                           {isVpaVerified && (
                             <p className="text-[10px] text-emerald-700 mt-1 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>VPA verified for instant debit notification</span>
+                              <span>VPA verified for payment request dispatch</span>
                             </p>
                           )}
                         </div>
@@ -405,18 +454,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 {/* 2. Credit Card or Debit Card */}
                 {(selectedMethod === 'Credit Card' || selectedMethod === 'Debit Card') && (
-                  <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="space-y-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                        Cardholder Name
+                        Cardholder Full Name
                       </label>
                       <input
                         type="text"
                         required
                         value={cardName}
                         onChange={(e) => setCardName(e.target.value)}
-                        placeholder="Name on card"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#0B192C]"
+                        placeholder="e.g. John Doe / Corporate Finance Ltd"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#0B192C]"
                       />
                     </div>
 
@@ -431,7 +480,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         value={cardNumber}
                         onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                         placeholder="4532 •••• •••• 8912"
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
                       />
                     </div>
 
@@ -447,7 +496,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           value={cardExpiry}
                           onChange={(e) => setCardExpiry(e.target.value)}
                           placeholder="MM/YY"
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
                         />
                       </div>
                       <div>
@@ -461,27 +510,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           value={cardCvv}
                           onChange={(e) => setCardCvv(e.target.value)}
                           placeholder="•••"
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-[#0B192C]"
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* 3. Net Banking */}
+                {/* 3. Net Banking & Direct Wire */}
                 {selectedMethod === 'Net Banking' && (
-                  <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+                  <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs text-xs">
+                    {/* Bank Selector */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
-                        Select Institution / Commercial Bank
+                        Select Institutional Banking Portal
                       </label>
                       <select
                         value={selectedBank}
                         onChange={(e) => setSelectedBank(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-[#0B192C]"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-[#0B192C]"
                       >
-                        <option value="HDFC Bank">HDFC Bank (Corporate NetBanking)</option>
                         <option value="State Bank of India">State Bank of India (SBI Global Trade)</option>
+                        <option value="HDFC Bank">HDFC Bank (Corporate NetBanking)</option>
                         <option value="ICICI Bank">ICICI Bank Commercial</option>
                         <option value="Axis Bank">Axis Bank Forex & Trade</option>
                         <option value="HSBC Global">HSBC Commercial Banking</option>
@@ -491,8 +541,63 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       </select>
                     </div>
 
-                    <div className="p-3 bg-white rounded-lg border border-slate-200 text-slate-600 text-[11px] leading-relaxed">
-                      You will be authenticated via <strong>{selectedBank}</strong> secure gateway. Once completed, your transaction reference will be synchronized to the Super Admin queue.
+                    {/* Official Beneficiary Bank Details Card */}
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                        <span className="font-heading font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <Building className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Official Corporate Beneficiary Account</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">{activeBanking.bankName}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Account Holder:</span>
+                          <strong className="text-slate-800">{activeBanking.accountHolderName}</strong>
+                        </div>
+
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Bank & Branch:</span>
+                          <span className="text-slate-700">{activeBanking.bankName}, {activeBanking.branchName || 'Corporate Trade Branch'}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Account Number:</span>
+                            <span className="font-mono font-bold text-slate-900">{activeBanking.accountNumber}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(activeBanking.accountNumber, 'acc')}
+                            className="p-1 text-slate-500 hover:text-slate-900 rounded cursor-pointer"
+                            title="Copy Account Number"
+                          >
+                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-200">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">IFSC / NEFT Code:</span>
+                            <span className="font-mono font-bold text-slate-900">{activeBanking.ifscCode}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(activeBanking.ifscCode, 'ifsc')}
+                            className="p-1 text-slate-500 hover:text-slate-900 rounded cursor-pointer"
+                            title="Copy IFSC Code"
+                          >
+                            {copiedIfsc ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {activeBanking.swiftBic && (
+                        <div className="text-[10px] text-slate-500 font-mono pt-1">
+                          SWIFT / BIC (International Wire): <strong>{activeBanking.swiftBic}</strong>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -506,7 +611,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   {isProcessing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
-                      <span>Transacting with Bank Node...</span>
+                      <span>Transacting with Bank Clearing Node...</span>
                     </>
                   ) : (
                     <>
@@ -520,7 +625,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               {/* Security Badge */}
               <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 pt-1">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>256-Bit Encrypted Trade Settlement • Auto Reference Callback to Super Admin</span>
+                <span>256-Bit Encrypted Trade Settlement • Real-Time Callback to Super Admin</span>
               </div>
             </div>
           )}

@@ -6,7 +6,8 @@ import {
   OrderRecord, 
   OrderStatus, 
   PaymentMethod,
-  SiteContent 
+  SiteContent,
+  BankingSettings
 } from '../types';
 import { 
   SUPER_ADMIN_IDENTITY, 
@@ -26,6 +27,12 @@ import {
   getStoredOrders,
   saveOrders,
   updateOrderStatus,
+  deleteOrder,
+  cancelOrder,
+  getStoredBankingSettings,
+  saveBankingSettings,
+  resetBankingSettings,
+  DEFAULT_BANKING_SETTINGS,
   getStoredSiteContent,
   saveSiteContent,
   resetSiteContent,
@@ -60,7 +67,12 @@ import {
   Check,
   Send,
   Sliders,
-  Building
+  Building,
+  CreditCard,
+  QrCode,
+  Smartphone,
+  Save,
+  Ban
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -73,6 +85,8 @@ interface AdminPanelModalProps {
   onSiteContentUpdated: (content: SiteContent) => void;
   orders: OrderRecord[];
   onOrdersUpdated: (orders: OrderRecord[]) => void;
+  bankingSettings?: BankingSettings;
+  onBankingSettingsUpdated?: (settings: BankingSettings) => void;
   onLogout: () => void;
 }
 
@@ -98,9 +112,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onSiteContentUpdated,
   orders,
   onOrdersUpdated,
+  bankingSettings: propBankingSettings,
+  onBankingSettingsUpdated,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'content' | 'customers' | 'security'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'content' | 'customers' | 'banking' | 'security'>('orders');
   
   // Orders State
   const [orderSearch, setOrderSearch] = useState('');
@@ -111,9 +127,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [paymentRefInput, setPaymentRefInput] = useState('');
   
   const [dispatchingOrder, setDispatchingOrder] = useState<OrderRecord | null>(null);
-  const [dispatchTatInput, setDispatchTatInput] = useState('5–7 business days via air freight');
+  const [dispatchTatInput, setDispatchTatInput] = useState('3–5 business days via BlueDart Air');
   const [trackingNumberInput, setTrackingNumberInput] = useState('');
   const [carrierNoticeInput, setCarrierNoticeInput] = useState('Customs cleared and freight carrier assigned.');
+
+  // Order Cancellation & Deletion Safeguard Modals
+  const [cancellingOrder, setCancellingOrder] = useState<OrderRecord | null>(null);
+  const [cancellationReasonInput, setCancellationReasonInput] = useState('Consignment requirement revised by consignee.');
+  const [deletingOrder, setDeletingOrder] = useState<OrderRecord | null>(null);
+
+  // Banking Settings State
+  const [bankingForm, setBankingForm] = useState<BankingSettings>(() => propBankingSettings || getStoredBankingSettings());
 
   // Product state
   const [productSearch, setProductSearch] = useState('');
@@ -232,9 +256,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     } else if (nextStatus === 'Order Dispatched') {
       // Trigger Estimated Delivery TAT / Tracking notice input
       setDispatchingOrder(order);
-      setDispatchTatInput(order.dispatchTat || '5–7 business days via air freight');
+      setDispatchTatInput(order.dispatchTat || '3–5 business days via BlueDart Air');
       setTrackingNumberInput(order.trackingNumber || `AWB-${Math.floor(10000000 + Math.random() * 90000000)}`);
       setCarrierNoticeInput(order.carrierNotice || 'Cleared at export terminal; maritime freight transit commenced.');
+    } else if (nextStatus === 'Order Cancelled') {
+      // Trigger Order Cancellation Modal
+      setCancellingOrder(order);
+      setCancellationReasonInput(order.cancellationReason || 'Consignment requirement revised by client / quota adjustment.');
     } else {
       // Direct update
       const updated = updateOrderStatus(order.id, nextStatus);
@@ -283,6 +311,49 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     onOrdersUpdated(allOrders);
     showToast(`Order #${dispatchingOrder.orderNumber} marked as DISPATCHED (TAT: ${dispatchTatInput.trim()})`);
     setDispatchingOrder(null);
+  };
+
+  const handleSaveCancelledOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingOrder) return;
+
+    if (!cancellationReasonInput.trim()) {
+      alert('Please specify a cancellation reason.');
+      return;
+    }
+
+    cancelOrder(cancellingOrder.id, cancellationReasonInput.trim());
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`Order #${cancellingOrder.orderNumber} marked as CANCELLED.`);
+    setCancellingOrder(null);
+    setCancellationReasonInput('');
+  };
+
+  const handleConfirmDeleteOrder = () => {
+    if (!deletingOrder) return;
+    deleteOrder(deletingOrder.id);
+    const allOrders = getStoredOrders();
+    onOrdersUpdated(allOrders);
+    showToast(`Order #${deletingOrder.orderNumber} permanently deleted.`);
+    setDeletingOrder(null);
+  };
+
+  // Banking Settings Actions
+  const handleSaveBankingSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveBankingSettings(bankingForm);
+    onBankingSettingsUpdated?.(bankingForm);
+    showToast('Payment gateway & banking settings saved! Reflected in all checkout views.');
+  };
+
+  const handleResetBankingSettings = () => {
+    if (window.confirm('Reset payment gateway and banking credentials to default Jayesh Wagh (wagh.jayesh@oksbi) configuration?')) {
+      const restored = resetBankingSettings();
+      setBankingForm(restored);
+      onBankingSettingsUpdated?.(restored);
+      showToast('Banking settings restored to default.');
+    }
   };
 
   // Product Actions
@@ -533,6 +604,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('banking')}
+              className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'banking'
+                  ? 'bg-[#0B192C] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+              <span>Payment Gateway & Banking</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('security')}
               className={`py-1.5 px-3 rounded-lg text-xs font-heading font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'security'
@@ -577,6 +660,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     <option value="Order Confirmed">Order Confirmed</option>
                     <option value="Order In-Process">Order In-Process</option>
                     <option value="Order Dispatched">Order Dispatched</option>
+                    <option value="Order Cancelled">Order Cancelled</option>
                     <option value="Delivered">Delivered</option>
                   </select>
                 </div>
@@ -601,6 +685,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       'Order Confirmed': 'bg-blue-100 text-blue-900 border-blue-300',
                       'Order In-Process': 'bg-purple-100 text-purple-900 border-purple-300',
                       'Order Dispatched': 'bg-emerald-100 text-emerald-900 border-emerald-300',
+                      'Order Cancelled': 'bg-red-100 text-red-900 border-red-300',
                       'Delivered': 'bg-slate-100 text-slate-800 border-slate-300'
                     };
 
@@ -623,7 +708,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             </span>
                           </div>
 
-                          {/* Status Transition Control Dropdown */}
+                          {/* Status Transition Control Dropdown & Permanent Deletion Safeguard */}
                           <div className="flex items-center gap-2">
                             <span className="text-[11px] text-slate-500 font-semibold font-heading uppercase">
                               Update Flow:
@@ -634,11 +719,20 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               className="px-3 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-[#0B192C] focus:outline-none focus:border-[#0B192C] cursor-pointer"
                             >
                               <option value="Order Received">Order Received</option>
-                              <option value="Order Confirmed">Order Confirmed (Requires Payment Ref)</option>
+                              <option value="Order Confirmed">Order Confirmed (Verify Payment Ref)</option>
                               <option value="Order In-Process">Order In-Process</option>
                               <option value="Order Dispatched">Order Dispatched (Set Delivery TAT)</option>
+                              <option value="Order Cancelled">Order Cancelled (Record Reason)</option>
                               <option value="Delivered">Delivered</option>
                             </select>
+
+                            <button
+                              onClick={() => setDeletingOrder(ord)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Permanently Delete Order Safeguard"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 
@@ -713,6 +807,20 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                 </div>
                                 {ord.trackingNumber && (
                                   <div className="font-mono text-[10px]">Tracking/BL: {ord.trackingNumber}</div>
+                                )}
+                              </div>
+                            )}
+
+                            {ord.cancellationReason && (
+                              <div className="p-2 rounded bg-red-50 border border-red-200 text-red-900 text-[11px] space-y-0.5">
+                                <div className="font-bold flex items-center gap-1 text-red-800">
+                                  <Ban className="w-3.5 h-3.5 text-red-600" />
+                                  <span>Cancellation: {ord.cancellationReason}</span>
+                                </div>
+                                {ord.cancelledAt && (
+                                  <div className="text-[10px] text-red-600 font-mono">
+                                    Terminated on {new Date(ord.cancelledAt).toLocaleString()}
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -1242,6 +1350,246 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </div>
           )}
 
+          {/* TAB: PAYMENT GATEWAY & BANKING SETTINGS */}
+          {activeTab === 'banking' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-amber-600 block">
+                        Commercial Settlement Gateway
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Live Synchronized
+                      </span>
+                    </div>
+                    <h3 className="font-heading text-lg font-bold text-slate-900 mt-0.5">
+                      Payment Gateway & Banking Settings
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure the active receiver UPI ID, primary Bank Account Number, IFSC code, and Beneficiary details. All checkout views, dynamically generated UPI payment links, and on-screen QR codes update immediately.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleResetBankingSettings}
+                      className="py-1.5 px-3 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset to Factory Defaults</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Form: 7 Columns */}
+                  <form onSubmit={handleSaveBankingSettings} className="lg:col-span-7 space-y-4">
+                    {/* Primary Receiver Section */}
+                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                      <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-amber-500" />
+                        <span>UPI Merchant & Instant QR Receiver</span>
+                      </h4>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Active Receiver UPI ID *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={bankingForm.upiId}
+                          onChange={(e) => setBankingForm({ ...bankingForm, upiId: e.target.value.trim() })}
+                          placeholder="e.g. wagh.jayesh@oksbi"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          Default: <strong className="text-slate-600 font-mono">wagh.jayesh@oksbi</strong>. Directly encodes into customer on-screen QR codes and deep intent triggers.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Beneficiary / Account Holder Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={bankingForm.accountHolderName}
+                          onChange={(e) => setBankingForm({ ...bankingForm, accountHolderName: e.target.value })}
+                          placeholder="e.g. Jayesh Wagh"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bank Wire & Net Banking Details */}
+                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                      <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-[#0B192C] flex items-center gap-2">
+                        <Building className="w-4 h-4 text-emerald-600" />
+                        <span>Direct Wire & Commercial Bank Coordinates</span>
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Primary Bank Account Number *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bankingForm.accountNumber}
+                            onChange={(e) => setBankingForm({ ...bankingForm, accountNumber: e.target.value.trim() })}
+                            placeholder="e.g. 50100492817291"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            IFSC / RTGS / NEFT Code *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bankingForm.ifscCode}
+                            onChange={(e) => setBankingForm({ ...bankingForm, ifscCode: e.target.value.trim().toUpperCase() })}
+                            placeholder="e.g. SBIN0001234"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Commercial Bank Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={bankingForm.bankName}
+                            onChange={(e) => setBankingForm({ ...bankingForm, bankName: e.target.value })}
+                            placeholder="e.g. State Bank of India"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            Branch Location
+                          </label>
+                          <input
+                            type="text"
+                            value={bankingForm.branchName || ''}
+                            onChange={(e) => setBankingForm({ ...bankingForm, branchName: e.target.value })}
+                            placeholder="e.g. Nariman Point Corporate Commercial, Mumbai"
+                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          International SWIFT / BIC Code
+                        </label>
+                        <input
+                          type="text"
+                          value={bankingForm.swiftBic || ''}
+                          onChange={(e) => setBankingForm({ ...bankingForm, swiftBic: e.target.value.trim().toUpperCase() })}
+                          placeholder="e.g. SBININBBXXX"
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                          Settlement Instructions & Escrow Notes
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={bankingForm.payoutNotes || ''}
+                          onChange={(e) => setBankingForm({ ...bankingForm, payoutNotes: e.target.value })}
+                          placeholder="Official settlement notes displayed to commercial clients on proforma checkout..."
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full py-3 px-4 bg-[#0B192C] hover:bg-slate-900 text-amber-400 font-heading text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Save & Broadcast Banking Settings</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Right: Live Customer Checkout Preview Card: 5 Columns */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-lg space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Live Customer Preview</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">Simulated Checkout</span>
+                      </div>
+
+                      {/* Preview QR Box */}
+                      <div className="bg-white text-slate-900 p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center">
+                        <div className="w-36 h-36 bg-white p-1 rounded-lg flex items-center justify-center">
+                          <img 
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(`upi://pay?pa=${bankingForm.upiId}&pn=${encodeURIComponent(bankingForm.accountHolderName)}&cu=INR`)}`}
+                            alt="Live Generated QR Preview"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1">
+                          <Smartphone className="w-3 h-3 text-emerald-600" />
+                          <span>Scan to Pay ({bankingForm.upiId})</span>
+                        </span>
+                      </div>
+
+                      {/* Displayed Credentials */}
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                          <span className="text-slate-400">Account Holder:</span>
+                          <strong className="text-white">{bankingForm.accountHolderName}</strong>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                          <span className="text-slate-400">Receiver UPI ID:</span>
+                          <strong className="font-mono text-amber-300">{bankingForm.upiId}</strong>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                          <span className="text-slate-400">Bank Name:</span>
+                          <span className="text-slate-200">{bankingForm.bankName}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                          <span className="text-slate-400">Account #:</span>
+                          <span className="font-mono text-slate-200">{bankingForm.accountNumber}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">IFSC / Code:</span>
+                          <span className="font-mono text-slate-200">{bankingForm.ifscCode}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300 leading-relaxed">
+                        Whenever any field on the left is updated and saved, all modal checkouts across arcavenglobal.com immediately adapt to this receiver account.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 5: ADMIN SECURITY */}
           {activeTab === 'security' && (
             <div className="max-w-xl mx-auto space-y-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
@@ -1460,6 +1808,112 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: ORDER CANCELLATION */}
+        {cancellingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Ban className="w-5 h-5 text-red-600" />
+                  <h3 className="font-heading font-bold text-slate-900 text-base">
+                    Cancel Order #{cancellingOrder.orderNumber}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setCancellingOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Cancelling this order will transition its status to <strong>Order Cancelled</strong>, notify the consignee, and cease commercial freight booking.
+              </p>
+
+              <form onSubmit={handleSaveCancelledOrder} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 font-heading uppercase tracking-wider">
+                    Official Cancellation Reason *
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={cancellationReasonInput}
+                    onChange={(e) => setCancellationReasonInput(e.target.value)}
+                    placeholder="e.g. Consignee requested commercial specification revision / export quota amendment."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#0B192C]"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancellingOrder(null)}
+                    className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                  >
+                    Keep Active
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-xs"
+                  >
+                    Confirm Cancellation
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: ORDER DELETION SAFEGUARD DIALOG */}
+        {deletingOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-2xl border border-red-200 shadow-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-heading font-bold text-slate-900 text-base">
+                    Delete Order #{deletingOrder.orderNumber}?
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setDeletingOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 bg-red-50 rounded-xl border border-red-100 text-red-800 text-xs leading-relaxed space-y-1">
+                <span className="font-bold block">Permanent Deletion Safeguard:</span>
+                <p>
+                  Are you sure you want to permanently delete order <strong>#{deletingOrder.orderNumber}</strong> for {deletingOrder.customerName}? This action will remove the record from browser storage and order tracking. This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletingOrder(null)}
+                  className="flex-1 py-2 px-3 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteOrder}
+                  className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-heading font-bold uppercase tracking-wider cursor-pointer shadow-md"
+                >
+                  Delete Permanently
+                </button>
+              </div>
             </div>
           </div>
         )}

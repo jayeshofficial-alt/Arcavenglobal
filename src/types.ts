@@ -55,6 +55,7 @@ export type OrderStatus =
   | 'Order Confirmed'
   | 'Order In-Process'
   | 'Order Dispatched'
+  | 'Order Cancelled'
   | 'Delivered';
 
 export type PaymentMethod = 
@@ -62,6 +63,18 @@ export type PaymentMethod =
   | 'Debit Card'
   | 'Net Banking'
   | 'UPI';
+
+export interface BankingSettings {
+  upiId: string; // Default: "wagh.jayesh@oksbi"
+  accountHolderName: string; // Default: "Jayesh Wagh"
+  accountNumber: string; // e.g. "50100492817291"
+  ifscCode: string; // e.g. "SBIN0001234"
+  bankName: string; // e.g. "State Bank of India"
+  branchName?: string;
+  swiftBic?: string;
+  payoutNotes?: string;
+  updatedAt: string;
+}
 
 export interface OrderItem {
   productId: string;
@@ -92,9 +105,11 @@ export interface OrderRecord {
   paymentMethod?: PaymentMethod;
   paymentReference?: string; // Captured Transaction / UTR / Reference ID
   paymentCompletedAt?: string;
-  dispatchTat?: string; // Estimated Delivery TAT / Tracking Notice e.g. "5–7 business days via air freight"
+  dispatchTat?: string; // Estimated Delivery TAT / Tracking Notice e.g. "3–5 business days via BlueDart Air"
   trackingNumber?: string;
   carrierNotice?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
   clientNotes?: string;
   adminNotes?: string;
   createdAt: string;
@@ -114,6 +129,7 @@ export interface SiteContent {
   contactPhone: string;
   contactEmail: string;
   contactHours: string;
+  footerDisclaimer?: string;
 }
 
 export interface CustomerInquiry {

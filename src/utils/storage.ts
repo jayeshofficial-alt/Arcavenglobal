@@ -5,7 +5,8 @@ import {
   OrderRecord, 
   OrderStatus, 
   PaymentMethod,
-  SiteContent 
+  SiteContent,
+  BankingSettings
 } from '../types';
 import { PRODUCTS, COMPANY_DETAILS } from '../data/productsData';
 
@@ -19,7 +20,52 @@ const USERS_STORAGE_KEY = 'arcaven_global_users_v3';
 const CURRENT_SESSION_KEY = 'arcaven_global_session_v3';
 const ORDERS_STORAGE_KEY = 'arcaven_global_orders_v3';
 const SITE_CONTENT_STORAGE_KEY = 'arcaven_global_site_content_v3';
+const BANKING_SETTINGS_KEY = 'arcaven_global_banking_settings_v3';
 const INQUIRIES_STORAGE_KEY = 'arcaven_global_inquiries_v3';
+
+// Default Payout & Banking Configuration as requested
+export const DEFAULT_BANKING_SETTINGS: BankingSettings = {
+  upiId: 'wagh.jayesh@oksbi',
+  accountHolderName: 'Jayesh Wagh',
+  accountNumber: '50100492817291',
+  ifscCode: 'SBIN0001234',
+  bankName: 'State Bank of India',
+  branchName: 'Nariman Point Corporate Commercial, Mumbai',
+  swiftBic: 'SBININBBXXX',
+  payoutNotes: 'Official Arca Ventures Global escrow & commercial trade settlement account.',
+  updatedAt: '2026-01-15T00:00:00.000Z'
+};
+
+export function getStoredBankingSettings(): BankingSettings {
+  try {
+    const raw = localStorage.getItem(BANKING_SETTINGS_KEY);
+    if (!raw) {
+      localStorage.setItem(BANKING_SETTINGS_KEY, JSON.stringify(DEFAULT_BANKING_SETTINGS));
+      return DEFAULT_BANKING_SETTINGS;
+    }
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_BANKING_SETTINGS, ...parsed };
+  } catch (err) {
+    console.error('Failed to parse banking settings:', err);
+    return DEFAULT_BANKING_SETTINGS;
+  }
+}
+
+export function saveBankingSettings(settings: BankingSettings): void {
+  try {
+    localStorage.setItem(BANKING_SETTINGS_KEY, JSON.stringify({
+      ...settings,
+      updatedAt: new Date().toISOString()
+    }));
+  } catch (err) {
+    console.error('Failed to save banking settings:', err);
+  }
+}
+
+export function resetBankingSettings(): BankingSettings {
+  saveBankingSettings(DEFAULT_BANKING_SETTINGS);
+  return DEFAULT_BANKING_SETTINGS;
+}
 
 // Cryptographic Salted Hashing Simulation (Zero plaintext credentials in storage/code)
 export function hashPassword(plainText: string): string {
@@ -760,6 +806,7 @@ export function updateOrderStatus(
     dispatchTat?: string;
     trackingNumber?: string;
     carrierNotice?: string;
+    cancellationReason?: string;
     adminNotes?: string;
   }
 ): OrderRecord {
@@ -794,6 +841,13 @@ export function updateOrderStatus(
         }
       }
 
+      if (newStatus === 'Order Cancelled') {
+        if (options?.cancellationReason) {
+          updated.cancellationReason = options.cancellationReason;
+        }
+        updated.cancelledAt = new Date().toISOString();
+      }
+
       updatedOrder = updated;
       return updated;
     }
@@ -803,6 +857,20 @@ export function updateOrderStatus(
   saveOrders(newOrders);
   if (!updatedOrder) throw new Error('Order record not found.');
   return updatedOrder;
+}
+
+export function cancelOrder(orderId: string, cancellationReason: string, adminNotes?: string): OrderRecord {
+  return updateOrderStatus(orderId, 'Order Cancelled', {
+    cancellationReason,
+    adminNotes: adminNotes || `Cancelled: ${cancellationReason}`
+  });
+}
+
+export function deleteOrder(orderId: string): boolean {
+  const orders = getStoredOrders();
+  const filtered = orders.filter(ord => ord.id !== orderId);
+  saveOrders(filtered);
+  return true;
 }
 
 export function recordOrderPayment(

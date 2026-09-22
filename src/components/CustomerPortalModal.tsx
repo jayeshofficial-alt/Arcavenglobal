@@ -122,6 +122,7 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
     'Order Confirmed': 'bg-blue-100 text-blue-900 border-blue-300',
     'Order In-Process': 'bg-purple-100 text-purple-900 border-purple-300',
     'Order Dispatched': 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    'Order Cancelled': 'bg-red-100 text-red-900 border-red-300',
     'Delivered': 'bg-slate-100 text-slate-800 border-slate-300'
   };
 
@@ -273,7 +274,12 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
 
                           {/* Payment Trigger */}
                           <div className="flex items-center gap-2">
-                            {needsPayment ? (
+                            {ord.status === 'Order Cancelled' ? (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-semibold">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                <span>Order Cancelled</span>
+                              </div>
+                            ) : needsPayment ? (
                               <button
                                 onClick={() => {
                                   onOpenPaymentForOrder(ord);
@@ -332,7 +338,24 @@ export const CustomerPortalModal: React.FC<CustomerPortalModalProps> = ({
                               Logistics Notice & TAT
                             </span>
 
-                            {ord.dispatchTat ? (
+                            {ord.status === 'Order Cancelled' ? (
+                              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-950 space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-xs text-red-800">
+                                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                                  <span>Consignment Cancelled</span>
+                                </div>
+                                {ord.cancellationReason && (
+                                  <div className="text-[11px] text-red-700 italic">
+                                    "{ord.cancellationReason}"
+                                  </div>
+                                )}
+                                {ord.cancelledAt && (
+                                  <div className="text-[10px] text-red-600 font-mono">
+                                    Terminated: {new Date(ord.cancelledAt).toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            ) : ord.dispatchTat ? (
                               <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-1">
                                 <div className="flex items-center gap-1.5 font-bold text-xs">
                                   <Truck className="w-4 h-4 text-emerald-700" />
